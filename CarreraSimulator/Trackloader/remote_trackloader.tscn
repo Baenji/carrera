@@ -1,0 +1,47 @@
+[gd_scene load_steps=3 format=3 uid="uid://dd6guuxalq0vt"]
+
+[ext_resource type="Script" uid="uid://2x0vpco8a141" path="res://Trackloader/remote_trackloader.gd" id="1_afam4"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ek1n3"]
+bg_color = Color(0.9607843, 0.9607843, 0.9607843, 0.38431373)
+
+[node name="RemoteTrackloader" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_afam4")
+
+[node name="BG" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_ek1n3")
+
+[node name="CENTER" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBOX" type="VBoxContainer" parent="CENTER"]
+layout_mode = 2
+
+[node name="INFO" type="Label" parent="CENTER/VBOX"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.068734206, 0.28496116, 0.3921351, 1)
+theme_override_font_sizes/font_size = 24
+text = "Waiting for connection on port '11360'"
+
+[node name="LOG" type="Label" parent="CENTER/VBOX"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.28019097, 0.37517682, 0.5768734, 1)
+theme_override_font_sizes/font_size = 24
+text = "To load a testtrack and skip the connection press 'B'."

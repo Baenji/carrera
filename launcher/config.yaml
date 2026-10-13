@@ -1,0 +1,61 @@
+components:
+  godot:
+    name: "Godot Simulator"
+    command: "godot --path CarreraSimulator -- Tracks/track_builder_2/track_02.tscn"
+    delay: 8
+
+  godot-sim:
+    name: "Godot Sim SIMULATION MODE (ONLY SCANS TRACK ORDER)"
+    command: "godot --sim --path CarreraSimulator -- Tracks/track_builder_2/track_02.tscn"
+    delay: 6
+
+  tracking:
+    name: "Object Tracking"
+    command: "python quick_object_tracking.py"
+    delay: 3
+
+  sim-training:
+    name: "RL with model sim"
+    command: "python CarreraSimulator/stable_baselines3_example.py --timesteps=30_000 --save_model_path=simmodel.zip --speedup=32"
+    delay: 0
+
+  rl-training:
+    name: "RL Training with model input"
+    command: "python CarreraSimulator/stable_baselines3_example.py --timesteps=1_000 --resume_model_path=simmodel.zip --save_model_path=rlmodel.zip"
+    delay: 0
+
+  rl-showoff:
+    name: "RL Showoff with model input"
+    command: "python CarreraSimulator/stable_baselines3_example.py --timesteps=20_000 --resume_model_path=rlmodel_good.zip"
+    delay: 0
+
+  training:
+    name: "RL Training"
+    command: "python CarreraSimulator/stable_baselines3_example.py"
+    delay: 0
+
+  tensorboard:
+    name: "TensorBoard"
+    command: "tensorboard --logdir=logs"
+    delay: 0
+
+  sb-full-train:
+    name: "Stable Baselines Full Training"
+    command: "python CarreraSimulator/stable_baselines3_example.py --timesteps=500_000 --resume_model_path=simmodel_better10.zip --save_model_path=simmodel_better11.zip --speedup=32 --n_parallel=8 --env_path=./CarreraSimulator/export/CarreraSim.exe"
+    delay: 2
+
+
+profiles:
+  full: [godot, training, tracking]
+  training: [godot, training]
+  simulation: [godot, tracking]
+  camera: [tracking]
+  tensorboard: [tensorboard]
+  sim-training: [godot-sim, sim-training, tracking]
+  sim-retraining: [godot-sim, sim-retraining, tracking]
+  rl-training: [godot, rl-training, tracking]
+  godot-sim: [godot-sim]
+  flex: [godot, rl-showoff, tracking]
+  flex2: [godot, tracking]
+  train: [godot-sim, tracking]
+  train-full: [sb-full-train]

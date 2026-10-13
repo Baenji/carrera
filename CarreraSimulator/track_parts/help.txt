@@ -1,0 +1,19 @@
+All textures are 4x the size of millimeters of the correct parts,
+so its 4 pixels = 1mm
+
+they are imported with a pixel size of 0.025
+meaning 1 straight that is 342mm in real life, is now 34.2 meter (Factor 1.000) 
+
+
+Part sizes:
+	track width: 114mm
+	curves have a quadratic width: 228mm
+	straights: 342mm
+	short straights: 114mm
+	distance between lane midpoints: 53mm + 5mm width (so maybe 58mm)
+	inner curve radius (middleline): 136mm (-5mm width) = 131mm 
+	outer curve radius (middleline): 189mm
+
+
+Our real slot car drives 10 laps in around 14.77s.
+Which is 1.478s per lap

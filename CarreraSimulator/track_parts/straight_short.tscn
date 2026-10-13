@@ -1,0 +1,49 @@
+[gd_scene load_steps=6 format=3 uid="uid://wowsphbfeiub"]
+
+[ext_resource type="Script" uid="uid://ca8egkfcunngf" path="res://track_parts/trackPart.gd" id="1_yja13"]
+[ext_resource type="Texture2D" uid="uid://dulf1cmrcntc8" path="res://track_parts/textures/short_straight_4x.png" id="2_yja13"]
+
+[sub_resource type="Curve3D" id="Curve3D_yja13"]
+_data = {
+"points": PackedVector3Array(-14.3, 0, 0, 13.8, 0, 0, 0, 0, -2.9, 0, 0, 0, 0, 0, 0, 11.4, 0, -2.9),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_aiwp8"]
+_data = {
+"points": PackedVector3Array(-14.3, 0, 0, 13.8, 0, 0, 0, 0, 2.9, 0, 0, 0, 0, 0, 0, 11.4, 0, 2.9),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="BoxMesh" id="BoxMesh_yja13"]
+
+[node name="StraightShort" type="Node3D" node_paths=PackedStringArray("start_connector", "end_connector", "inner_path", "outer_path")]
+script = ExtResource("1_yja13")
+start_connector = NodePath("StartConnector")
+end_connector = NodePath("EndConnector")
+inner_path = NodePath("InnerPath")
+outer_path = NodePath("OuterPath")
+
+[node name="Texture" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 5.7, 0, 0)
+pixel_size = 0.025
+texture = ExtResource("2_yja13")
+
+[node name="StartConnector" type="Node3D" parent="."]
+
+[node name="EndConnector" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.4, 0, 0)
+
+[node name="OuterPath" type="Path3D" parent="."]
+curve = SubResource("Curve3D_yja13")
+debug_custom_color = Color(1, 0.44705883, 1, 1)
+
+[node name="InnerPath" type="Path3D" parent="."]
+curve = SubResource("Curve3D_aiwp8")
+debug_custom_color = Color(0, 0.8454186, 0.39311463, 1)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.8393974, 0, 8)
+mesh = SubResource("BoxMesh_yja13")

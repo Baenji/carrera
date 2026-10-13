@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ds-carrera"
+version = "2.0.0"
+description = "Computer vision and RL system for Carrera slot car racing track"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    {name = "DS-Carrera Team"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "opencv-python",
+    "pupil-apriltags",
+    "numpy",
+    "godot-rl",
+    "stable-baselines3",
+    "tensorflow",
+    "tensorboard",
+    "pyserial",
+]
+
+[project.scripts]
+carrera-track = "src.main:main"
+
+[tool.setuptools]
+packages = ["src", "src.camera", "src.tracking", "src.network", "src.hardware", "src.hardware.arduino"]

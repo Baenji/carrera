@@ -1,0 +1,267 @@
+[gd_scene load_steps=14 format=3 uid="uid://b3axd7spkulbx"]
+
+[ext_resource type="Script" uid="uid://o0amxf4emleh" path="res://Tracks/track_builder_2/TrackBuilder.gd" id="1_5mbpw"]
+[ext_resource type="Script" uid="uid://v5irb7i7gic5" path="res://Tracks/track_builder_2/camera_car.gd" id="2_glrv4"]
+[ext_resource type="Script" uid="uid://dtj1fr88a11rc" path="res://Tracks/track_builder_2/racecar_with_camera_reset.gd" id="3_mqm3t"]
+[ext_resource type="PackedScene" uid="uid://cmwxn0eqhsc3j" path="res://racecar_mdl/2018 BMW M8 GTE.glb" id="4_c3mf8"]
+[ext_resource type="PackedScene" uid="uid://dd6guuxalq0vt" path="res://Trackloader/remote_trackloader.tscn" id="5_ekehe"]
+[ext_resource type="Script" uid="uid://c4iykaqvtfk6v" path="res://Tracks/track_builder_2/rl_controller_base.gd" id="5_glrv4"]
+[ext_resource type="Script" uid="uid://bnsj1xjji5yjk" path="res://addons/godot_rl_agents/sync.gd" id="7_mqm3t"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_22md1"]
+sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+ground_bottom_color = Color(0.34588507, 0.00048092246, 0.9956954, 1)
+ground_horizon_color = Color(0.5577395, 0.64567053, 1, 1)
+
+[sub_resource type="Sky" id="Sky_h2js2"]
+sky_material = SubResource("ProceduralSkyMaterial_22md1")
+
+[sub_resource type="Environment" id="Environment_br6d7"]
+background_mode = 2
+background_color = Color(0, 0, 1, 1)
+sky = SubResource("Sky_h2js2")
+tonemap_mode = 2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_6asio"]
+transparency = 1
+blend_mode = 1
+albedo_color = Color(4.235506e-06, 0.6432965, 0.2852917, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_8lypo"]
+size = Vector3(5, 3, 10)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8lypo"]
+transparency = 1
+albedo_color = Color(0.9759901, 0, 0.4032035, 1)
+
+[node name="Track" type="Node3D" node_paths=PackedStringArray("track_loader")]
+script = ExtResource("1_5mbpw")
+track_loader = NodePath("RemoteTrackloader")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_br6d7")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="." node_paths=PackedStringArray("cam_pivot")]
+transform = Transform3D(1, 0, 0, 0, 0.3802311, 0.9248916, 0, -0.9248916, 0.3802311, 9.536743e-07, 181.67685, 148.83833)
+script = ExtResource("2_glrv4")
+cam_pivot = NodePath("../Path3D/SimCarModel/2018 BMW M8 GTE/CamPivot")
+
+[node name="Path3D" type="Path3D" parent="."]
+debug_custom_color = Color(1, 0, 0, 1)
+
+[node name="SimCarModel" type="PathFollow3D" parent="Path3D"]
+use_model_front = true
+cubic_interp = false
+tilt_enabled = false
+script = ExtResource("3_mqm3t")
+
+[node name="2018 BMW M8 GTE" parent="Path3D/SimCarModel" instance=ExtResource("4_c3mf8")]
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0)
+
+[node name="CamPivot" type="Node3D" parent="Path3D/SimCarModel/2018 BMW M8 GTE"]
+transform = Transform3D(-0.5, 1.659079e-08, -4.0440465e-08, 0, 0.462585, 0.18977651, 4.371139e-08, 0.18977651, -0.462585, 0, 2.0944242, -2.977478)
+
+[node name="AIController3D" type="Node3D" parent="Path3D/SimCarModel"]
+script = ExtResource("5_glrv4")
+metadata/_custom_type_script = "uid://8kepumeovsxj"
+
+[node name="TrackedCarModel" type="PathFollow3D" parent="Path3D"]
+unique_name_in_owner = true
+
+[node name="GhostCube" type="MeshInstance3D" parent="Path3D/TrackedCarModel"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+material_override = SubResource("StandardMaterial3D_6asio")
+mesh = SubResource("BoxMesh_8lypo")
+
+[node name="DeviationMarker" type="PathFollow3D" parent="Path3D"]
+
+[node name="GhostCube" type="MeshInstance3D" parent="Path3D/DeviationMarker"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+material_override = SubResource("StandardMaterial3D_8lypo")
+mesh = SubResource("BoxMesh_8lypo")
+
+[node name="RemoteTrackloader" parent="." instance=ExtResource("5_ekehe")]
+
+[node name="Track" type="Node3D" parent="."]
+
+[node name="Information" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="VBOX" type="VBoxContainer" parent="Information"]
+custom_minimum_size = Vector2(128, 0)
+layout_mode = 0
+offset_left = 29.0
+offset_top = 30.0
+offset_right = 69.0
+offset_bottom = 70.0
+
+[node name="Deviation" type="HBoxContainer" parent="Information/VBOX"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DeviationLabel" type="Label" parent="Information/VBOX/Deviation"]
+layout_mode = 2
+tooltip_text = "Explanation:
+
+Absolute Deviation measures how far apart the progress of both cars on the track is, measured on the track progress.
+
+Positive values mean:
+- the Tracked (real) Car is faster than Simulated Car
+
+Negative values mean:
+- the Tracked (real) Car is slower than Simulated Car
+
+The nearer this value is to 0.00% the better the simulated car matches the real car."
+mouse_filter = 0
+text = "Absolute Deviation"
+
+[node name="DeviationInfo" type="Label" parent="Information/VBOX/Deviation"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+text = "0.00%"
+horizontal_alignment = 2
+
+[node name="SpeedLevelCorrection" type="HBoxContainer" parent="Information/VBOX"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="SpeedLevelLabel" type="Label" parent="Information/VBOX/SpeedLevelCorrection"]
+layout_mode = 2
+tooltip_text = "Explanation:
+
+Absolute Deviation measures how far apart the progress of both cars on the track is, measured on the track progress.
+
+Positive values mean:
+- the Tracked (real) Car is faster than Simulated Car
+
+Negative values mean:
+- the Tracked (real) Car is slower than Simulated Car
+
+The nearer this value is to 0.00% the better the simulated car matches the real car."
+mouse_filter = 0
+text = "Speed Correction"
+
+[node name="SpeedLevelInfo" type="Label" parent="Information/VBOX/SpeedLevelCorrection"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+text = "0"
+horizontal_alignment = 2
+
+[node name="TrackPart" type="HBoxContainer" parent="Information/VBOX"]
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="TrackPartLabel" type="Label" parent="Information/VBOX/TrackPart"]
+layout_mode = 2
+tooltip_text = "Explanation:
+
+Absolute Deviation measures how far apart the progress of both cars on the track is, measured on the track progress.
+
+Positive values mean:
+- the Tracked (real) Car is faster than Simulated Car
+
+Negative values mean:
+- the Tracked (real) Car is slower than Simulated Car
+
+The nearer this value is to 0.00% the better the simulated car matches the real car."
+mouse_filter = 0
+text = "Track Part"
+
+[node name="TrackPartInfo" type="Label" parent="Information/VBOX/TrackPart"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+text = "0"
+horizontal_alignment = 2
+
+[node name="Reward" type="HBoxContainer" parent="Information/VBOX"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RewardLabel" type="Label" parent="Information/VBOX/Reward"]
+layout_mode = 2
+tooltip_text = "Explanation:
+
+Absolute Deviation measures how far apart the progress of both cars on the track is, measured on the track progress.
+
+Positive values mean:
+- the Tracked (real) Car is faster than Simulated Car
+
+Negative values mean:
+- the Tracked (real) Car is slower than Simulated Car
+
+The nearer this value is to 0.00% the better the simulated car matches the real car."
+mouse_filter = 0
+text = "Reward"
+
+[node name="RewardInfo" type="Label" parent="Information/VBOX/Reward"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+text = "0"
+horizontal_alignment = 2
+
+[node name="Reward2" type="HBoxContainer" parent="Information/VBOX"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RewardLabel" type="Label" parent="Information/VBOX/Reward2"]
+layout_mode = 2
+tooltip_text = "Explanation:
+
+Absolute Deviation measures how far apart the progress of both cars on the track is, measured on the track progress.
+
+Positive values mean:
+- the Tracked (real) Car is faster than Simulated Car
+
+Negative values mean:
+- the Tracked (real) Car is slower than Simulated Car
+
+The nearer this value is to 0.00% the better the simulated car matches the real car."
+mouse_filter = 0
+text = "Round Reward"
+
+[node name="RoundRewardInfo" type="Label" parent="Information/VBOX/Reward2"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+text = "0"
+horizontal_alignment = 2
+
+[node name="Throttle" type="HBoxContainer" parent="Information/VBOX"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ThrottleLabel" type="Label" parent="Information/VBOX/Throttle"]
+layout_mode = 2
+tooltip_text = "Explanation:
+
+Absolute Deviation measures how far apart the progress of both cars on the track is, measured on the track progress.
+
+Positive values mean:
+- the Tracked (real) Car is faster than Simulated Car
+
+Negative values mean:
+- the Tracked (real) Car is slower than Simulated Car
+
+The nearer this value is to 0.00% the better the simulated car matches the real car."
+mouse_filter = 0
+text = "Throttle"
+
+[node name="ThrottleInfo" type="Label" parent="Information/VBOX/Throttle"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+text = "0"
+horizontal_alignment = 2
+
+[node name="Sync" type="Node" parent="."]
+script = ExtResource("7_mqm3t")
+action_repeat = 12
+metadata/_custom_type_script = "uid://bnsj1xjji5yjk"

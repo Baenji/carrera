@@ -1,0 +1,351 @@
+[gd_scene load_steps=14 format=3 uid="uid://jcxuk0srv4h6"]
+
+[ext_resource type="Script" uid="uid://w4yj2krqm4gq" path="res://Tracks/old/racecar.gd" id="1_htt2y"]
+[ext_resource type="Texture2D" uid="uid://b5msj5eqqwy1i" path="res://Tracks/old/layout_01.jpg" id="1_iwb7j"]
+[ext_resource type="Script" uid="uid://dbptve1lfn04x" path="res://Tracks/old/ai_controller_3d.gd" id="2_0fain"]
+[ext_resource type="Script" uid="uid://bnsj1xjji5yjk" path="res://addons/godot_rl_agents/sync.gd" id="4_tbwfs"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_htt2y"]
+sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+
+[sub_resource type="Sky" id="Sky_0fain"]
+sky_material = SubResource("ProceduralSkyMaterial_htt2y")
+
+[sub_resource type="Environment" id="Environment_tbwfs"]
+background_mode = 2
+sky = SubResource("Sky_0fain")
+tonemap_mode = 2
+
+[sub_resource type="Curve3D" id="Curve3D_l5ouk"]
+closed = true
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -0.16491628, 0, 0, 0, 0, 0, 0, 0, 0, -1.9064023, 0, -0.01144886, 0, 0, 0, 0, 0, 0, -3.709077, -1.335144e-05, 0.0035567284, 0, 0, 0, 0, 0, 0, -4.7631736, 0.00048160553, -0.6202955, 0, 0, 0, 0, 0, 0, -4.956783, 0.0010032654, -1.2764158, 0, 0, 0, 0, 0, 0, -4.9460263, 0.002415657, -3.0511672, 0, 0, 0, 0, 0, 0, -4.9352713, 0.0038194656, -4.8151636, 0, 0, 0, 0, 0, 0, -4.940139, 0.0037841797, -6.5460987, 0, 0, 0, 0, 0, 0, -4.940139, 0.0037841797, -8.345659, 0, 0, 0, 0, 0, 0, -4.318068, 0.0037841797, -9.445391, 0, 0, 0, 0, 0, 0, -3.0628195, 0.0037841797, -9.434282, 0, 0, 0, 0, 0, 0, -2.3852072, 0.0037841797, -8.345659, 0, 0, 0, 0, 0, 0, -2.5629416, 0.0037841797, -7.7124805, 0, 0, 0, 0, 0, 0, -3.4516134, 0.0037841797, -6.179522, 0, 0, 0, 0, 0, 0, -3.6959982, 0.0037841797, -5.3352838, 0, 0, 0, 0, 0, 0, -3.718215, 0.0037841797, -3.5246143, 0, 0, 0, 0, 0, 0, -3.6848898, 0.0037841797, -2.9358702, 0, 0, 0, 0, 0, 0, -2.796218, 0.0037841797, -1.3918023, 0, 0, 0, 0, 0, 0, -2.2741232, 0.0037841797, -1.0807667, 0, 0, 0, 0, 0, 0, -0.5189962, 0.0037841797, -1.0474417, 0, 0, 0, 0, 0, 0, 1.0361797, 0.0037841797, -1.969439, 0, 0, 0, 0, 0, 0, 2.5691385, 0.0037841797, -2.8470027, 0, 0, 0, 0, 0, 0, 3.4578104, 0.0037841797, -4.357744, 0, 0, 0, 0, 0, 0, 3.4355946, 0.0037841797, -4.7798634, 0, 0, 0, 0, 0, 0, 2.5580301, 0.0037841797, -6.3794727, 0, 0, 0, 0, 0, 0, 1.0250713, 0.0037841797, -7.2348194, 0, 0, 0, 0, 0, 0, 0.3474589, 0.0037841797, -8.334551, 0, 0, 0, 0, 0, 0, 0.9695293, 0.0037841797, -9.389849, 0, 0, 0, 0, 0, 0, 1.5915996, 0.0037841797, -9.5786915, 0, 0, 0, 0, 0, 0, 3.3578348, 0.0037841797, -9.600908, 0, 0, 0, 0, 0, 0, 4.035447, 0.0037841797, -9.445391, 0, 0, 0, 0, 0, 0, 4.6908426, 0.0037841797, -8.378984, 0, 0, 0, 0, 0, 0, 4.668626, 0.0037841797, -6.5572076, 0, 0, 0, 0, 0, 0, 4.679734, 0.0037841797, -4.7798634, 0, 0, 0, 0, 0, 0, 4.6353006, 0.0037841797, -3.06917, 0, 0, 0, 0, 0, 0, 4.6575174, 0.0037841797, -1.2696099, 0, 0, 0, 0, 0, 0, 4.479783, 0.0037841797, -0.70308113, 0, 0, 0, 0, 0, 0, 3.446702, 0.0037841797, -0.014360905, 0, 0, 0, 0, 0, 0, 1.6249238, 0.0037841797, -0.0476861),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 39
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_iwb7j"]
+albedo_color = Color(0.73117125, 0.38810742, 0.28288782, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_iwb7j"]
+size = Vector3(0.3, 0.1, 0.75)
+
+[sub_resource type="Animation" id="Animation_0fain"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("MeshInstance3D:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0.0023555756, 0, 0.39227444)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("MeshInstance3D:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_htt2y"]
+resource_name = "crash"
+loop_mode = 2
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("MeshInstance3D:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(0.0023555756, 0, 0.39227444), Vector3(-1.346798, 0, 0.40114403)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("MeshInstance3D:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0.0024893642, 0.012658664, 2.753247)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_tbwfs"]
+_data = {
+&"RESET": SubResource("Animation_0fain"),
+&"crash": SubResource("Animation_htt2y")
+}
+
+[node name="Track01" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_tbwfs")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
+shadow_enabled = true
+
+[node name="Iteration" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.470567, 0, -2)
+
+[node name="Innerpath3D" type="Path3D" parent="Iteration"]
+transform = Transform3D(0.19, 0, 0, 0, 0.19, 0, 0, 0, 0.19, 0, 0, 0.8721368)
+curve = SubResource("Curve3D_l5ouk")
+
+[node name="Racecar" type="PathFollow3D" parent="Iteration/Innerpath3D"]
+transform = Transform3D(0.006573958, 0, 0.99996394, 0, 0.9999963, 0, -0.99996245, 0, 0.0065739676, -0.16491628, 0, 0)
+script = ExtResource("1_htt2y")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Iteration/Innerpath3D/Racecar"]
+transform = Transform3D(0.9999998, 0, 0, 0, 0.9999999, 0, 0, 0, 0.9999999, 0.0023555756, 0, 0.39227444)
+material_override = SubResource("StandardMaterial3D_iwb7j")
+mesh = SubResource("BoxMesh_iwb7j")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="Iteration/Innerpath3D/Racecar"]
+libraries = {
+&"": SubResource("AnimationLibrary_tbwfs")
+}
+
+[node name="AIController3D" type="Node3D" parent="Iteration/Innerpath3D/Racecar"]
+script = ExtResource("2_0fain")
+reset_after = 8000
+metadata/_custom_type_script = "uid://8kepumeovsxj"
+
+[node name="Sprite3D" type="Sprite3D" parent="Iteration"]
+transform = Transform3D(0.19, 0, 0, 0, -8.305164e-09, 0.19, 0, -0.19, -8.305164e-09, 0, 0, 0)
+texture = ExtResource("1_iwb7j")
+
+[node name="Iteration2" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4705672, 0, -2)
+
+[node name="Innerpath3D" type="Path3D" parent="Iteration2"]
+transform = Transform3D(0.19, 0, 0, 0, 0.19, 0, 0, 0, 0.19, 0, 0, 0.8721368)
+curve = SubResource("Curve3D_l5ouk")
+
+[node name="Racecar" type="PathFollow3D" parent="Iteration2/Innerpath3D"]
+transform = Transform3D(0.0065739574, 0, 0.9999639, 0, 0.9999963, 0, -0.9999624, 0, 0.0065739676, -0.16491628, 0, 0)
+script = ExtResource("1_htt2y")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Iteration2/Innerpath3D/Racecar"]
+transform = Transform3D(0.9999998, 0, 0, 0, 0.9999999, 0, 0, 0, 0.9999999, 0.0023555756, 0, 0.39227444)
+material_override = SubResource("StandardMaterial3D_iwb7j")
+mesh = SubResource("BoxMesh_iwb7j")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="Iteration2/Innerpath3D/Racecar"]
+libraries = {
+&"": SubResource("AnimationLibrary_tbwfs")
+}
+
+[node name="AIController3D" type="Node3D" parent="Iteration2/Innerpath3D/Racecar"]
+script = ExtResource("2_0fain")
+reset_after = 8000
+metadata/_custom_type_script = "uid://8kepumeovsxj"
+
+[node name="Sprite3D" type="Sprite3D" parent="Iteration2"]
+transform = Transform3D(0.19, 0, 0, 0, -8.305164e-09, 0.19, 0, -0.19, -8.305164e-09, 0, 0, 0)
+texture = ExtResource("1_iwb7j")
+
+[node name="Iteration3" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.470567, 0, 1)
+
+[node name="Innerpath3D" type="Path3D" parent="Iteration3"]
+transform = Transform3D(0.19, 0, 0, 0, 0.19, 0, 0, 0, 0.19, 0, 0, 0.8721368)
+curve = SubResource("Curve3D_l5ouk")
+
+[node name="Racecar" type="PathFollow3D" parent="Iteration3/Innerpath3D"]
+transform = Transform3D(0.0065739574, 0, 0.9999639, 0, 0.9999963, 0, -0.9999624, 0, 0.0065739676, -0.16491628, 0, 0)
+script = ExtResource("1_htt2y")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Iteration3/Innerpath3D/Racecar"]
+transform = Transform3D(0.9999998, 0, 0, 0, 0.9999999, 0, 0, 0, 0.9999999, 0.0023555756, 0, 0.39227444)
+material_override = SubResource("StandardMaterial3D_iwb7j")
+mesh = SubResource("BoxMesh_iwb7j")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="Iteration3/Innerpath3D/Racecar"]
+libraries = {
+&"": SubResource("AnimationLibrary_tbwfs")
+}
+
+[node name="AIController3D" type="Node3D" parent="Iteration3/Innerpath3D/Racecar"]
+script = ExtResource("2_0fain")
+reset_after = 8000
+metadata/_custom_type_script = "uid://8kepumeovsxj"
+
+[node name="Sprite3D" type="Sprite3D" parent="Iteration3"]
+transform = Transform3D(0.19, 0, 0, 0, -8.305164e-09, 0.19, 0, -0.19, -8.305164e-09, 0, 0, 0)
+texture = ExtResource("1_iwb7j")
+
+[node name="Iteration4" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4705672, 0, 1)
+
+[node name="Innerpath3D" type="Path3D" parent="Iteration4"]
+transform = Transform3D(0.19, 0, 0, 0, 0.19, 0, 0, 0, 0.19, 0, 0, 0.8721368)
+curve = SubResource("Curve3D_l5ouk")
+
+[node name="Racecar" type="PathFollow3D" parent="Iteration4/Innerpath3D"]
+transform = Transform3D(0.0065739574, 0, 0.9999638, 0, 0.9999963, 0, -0.99996233, 0, 0.006573967, -0.16491628, 0, 0)
+script = ExtResource("1_htt2y")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Iteration4/Innerpath3D/Racecar"]
+transform = Transform3D(0.9999998, 0, 0, 0, 0.9999999, 0, 0, 0, 0.9999999, 0.0023555756, 0, 0.39227444)
+material_override = SubResource("StandardMaterial3D_iwb7j")
+mesh = SubResource("BoxMesh_iwb7j")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="Iteration4/Innerpath3D/Racecar"]
+libraries = {
+&"": SubResource("AnimationLibrary_tbwfs")
+}
+
+[node name="AIController3D" type="Node3D" parent="Iteration4/Innerpath3D/Racecar"]
+script = ExtResource("2_0fain")
+reset_after = 8000
+metadata/_custom_type_script = "uid://8kepumeovsxj"
+
+[node name="Sprite3D" type="Sprite3D" parent="Iteration4"]
+transform = Transform3D(0.19, 0, 0, 0, -8.305164e-09, 0.19, 0, -0.19, -8.305164e-09, 0, 0, 0)
+texture = ExtResource("1_iwb7j")
+
+[node name="Iteration5" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5294328, 0, -2)
+
+[node name="Innerpath3D" type="Path3D" parent="Iteration5"]
+transform = Transform3D(0.19, 0, 0, 0, 0.19, 0, 0, 0, 0.19, 0, 0, 0.8721368)
+curve = SubResource("Curve3D_l5ouk")
+
+[node name="Racecar" type="PathFollow3D" parent="Iteration5/Innerpath3D"]
+transform = Transform3D(0.0065739574, 0, 0.9999639, 0, 0.9999963, 0, -0.9999624, 0, 0.0065739676, -0.16491628, 0, 0)
+script = ExtResource("1_htt2y")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Iteration5/Innerpath3D/Racecar"]
+transform = Transform3D(0.9999998, 0, 0, 0, 0.9999999, 0, 0, 0, 0.9999999, 0.0023555756, 0, 0.39227444)
+material_override = SubResource("StandardMaterial3D_iwb7j")
+mesh = SubResource("BoxMesh_iwb7j")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="Iteration5/Innerpath3D/Racecar"]
+libraries = {
+&"": SubResource("AnimationLibrary_tbwfs")
+}
+
+[node name="AIController3D" type="Node3D" parent="Iteration5/Innerpath3D/Racecar"]
+script = ExtResource("2_0fain")
+reset_after = 8000
+metadata/_custom_type_script = "uid://8kepumeovsxj"
+
+[node name="Sprite3D" type="Sprite3D" parent="Iteration5"]
+transform = Transform3D(0.19, 0, 0, 0, -8.305164e-09, 0.19, 0, -0.19, -8.305164e-09, 0, 0, 0)
+texture = ExtResource("1_iwb7j")
+
+[node name="Iteration6" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.529433, 0, -2)
+
+[node name="Innerpath3D" type="Path3D" parent="Iteration6"]
+transform = Transform3D(0.19, 0, 0, 0, 0.19, 0, 0, 0, 0.19, 0, 0, 0.8721368)
+curve = SubResource("Curve3D_l5ouk")
+
+[node name="Racecar" type="PathFollow3D" parent="Iteration6/Innerpath3D"]
+transform = Transform3D(0.0065739574, 0, 0.9999638, 0, 0.9999963, 0, -0.99996233, 0, 0.006573967, -0.16491628, 0, 0)
+script = ExtResource("1_htt2y")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Iteration6/Innerpath3D/Racecar"]
+transform = Transform3D(0.9999998, 0, 0, 0, 0.9999999, 0, 0, 0, 0.9999999, 0.0023555756, 0, 0.39227444)
+material_override = SubResource("StandardMaterial3D_iwb7j")
+mesh = SubResource("BoxMesh_iwb7j")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="Iteration6/Innerpath3D/Racecar"]
+libraries = {
+&"": SubResource("AnimationLibrary_tbwfs")
+}
+
+[node name="AIController3D" type="Node3D" parent="Iteration6/Innerpath3D/Racecar"]
+script = ExtResource("2_0fain")
+reset_after = 8000
+metadata/_custom_type_script = "uid://8kepumeovsxj"
+
+[node name="Sprite3D" type="Sprite3D" parent="Iteration6"]
+transform = Transform3D(0.19, 0, 0, 0, -8.305164e-09, 0.19, 0, -0.19, -8.305164e-09, 0, 0, 0)
+texture = ExtResource("1_iwb7j")
+
+[node name="Iteration7" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5294328, 0, 1)
+
+[node name="Innerpath3D" type="Path3D" parent="Iteration7"]
+transform = Transform3D(0.19, 0, 0, 0, 0.19, 0, 0, 0, 0.19, 0, 0, 0.8721368)
+curve = SubResource("Curve3D_l5ouk")
+
+[node name="Racecar" type="PathFollow3D" parent="Iteration7/Innerpath3D"]
+transform = Transform3D(0.0065739574, 0, 0.9999638, 0, 0.9999963, 0, -0.99996233, 0, 0.006573967, -0.16491628, 0, 0)
+script = ExtResource("1_htt2y")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Iteration7/Innerpath3D/Racecar"]
+transform = Transform3D(0.9999998, 0, 0, 0, 0.9999999, 0, 0, 0, 0.9999999, 0.0023555756, 0, 0.39227444)
+material_override = SubResource("StandardMaterial3D_iwb7j")
+mesh = SubResource("BoxMesh_iwb7j")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="Iteration7/Innerpath3D/Racecar"]
+libraries = {
+&"": SubResource("AnimationLibrary_tbwfs")
+}
+
+[node name="AIController3D" type="Node3D" parent="Iteration7/Innerpath3D/Racecar"]
+script = ExtResource("2_0fain")
+reset_after = 8000
+metadata/_custom_type_script = "uid://8kepumeovsxj"
+
+[node name="Sprite3D" type="Sprite3D" parent="Iteration7"]
+transform = Transform3D(0.19, 0, 0, 0, -8.305164e-09, 0.19, 0, -0.19, -8.305164e-09, 0, 0, 0)
+texture = ExtResource("1_iwb7j")
+
+[node name="Iteration8" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.529433, 0, 1)
+
+[node name="Innerpath3D" type="Path3D" parent="Iteration8"]
+transform = Transform3D(0.19, 0, 0, 0, 0.19, 0, 0, 0, 0.19, 0, 0, 0.8721368)
+curve = SubResource("Curve3D_l5ouk")
+
+[node name="Racecar" type="PathFollow3D" parent="Iteration8/Innerpath3D"]
+transform = Transform3D(0.006573957, 0, 0.99996376, 0, 0.9999963, 0, -0.9999623, 0, 0.0065739667, -0.16491628, 0, 0)
+script = ExtResource("1_htt2y")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Iteration8/Innerpath3D/Racecar"]
+transform = Transform3D(0.9999998, 0, 0, 0, 0.9999999, 0, 0, 0, 0.9999999, 0.0023555756, 0, 0.39227444)
+material_override = SubResource("StandardMaterial3D_iwb7j")
+mesh = SubResource("BoxMesh_iwb7j")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="Iteration8/Innerpath3D/Racecar"]
+libraries = {
+&"": SubResource("AnimationLibrary_tbwfs")
+}
+
+[node name="AIController3D" type="Node3D" parent="Iteration8/Innerpath3D/Racecar"]
+script = ExtResource("2_0fain")
+reset_after = 8000
+metadata/_custom_type_script = "uid://8kepumeovsxj"
+
+[node name="Sprite3D" type="Sprite3D" parent="Iteration8"]
+transform = Transform3D(0.19, 0, 0, 0, -8.305164e-09, 0.19, 0, -0.19, -8.305164e-09, 0, 0, 0)
+texture = ExtResource("1_iwb7j")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.12922837, 0.9916149, 0, -0.9916149, 0.12922837, 0, 4.616077, 0.54161835)
+fov = 75.9
+size = 2.0
+
+[node name="Sync" type="Node" parent="."]
+script = ExtResource("4_tbwfs")
+metadata/_custom_type_script = "uid://bnsj1xjji5yjk"

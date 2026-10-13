@@ -1,0 +1,8 @@
+opencv-python
+pupil-apriltags
+numpy
+godot-rl
+stable-baselines3
+tensorflow
+tensorboard
+pyserial
