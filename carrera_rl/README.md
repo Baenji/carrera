@@ -35,6 +35,10 @@ Kamera fest montieren, Auto von der Strecke nehmen, dann:
 python -m carrera_rl.camera_calib --camera --out calibration/camera.json
 ```
 
+Standard: Kamera 0, Messfahrten in 1280×720 mit 60 fps (Logitech BRIO). Die Tags werden
+in einem zusätzlichen 1920×1080-Bild gesucht. Andere Kamera: `--cam-index N`.
+Die Ausgabe nennt den Restfehler. Er sollte unter ~1 mm liegen.
+
 Danach unbedingt `calibration/camera_overlay.png` ansehen: Die grüne Linie (gefahrene Spur)
 und die magentafarbene (andere Spur) müssen auf den Schlitzen liegen. Der rote Punkt `s=0`
 markiert den Anfang der Start/Ziel-Geraden. Wird die Kamera bewegt, neu kalibrieren.
@@ -80,6 +84,22 @@ Ergebnis ist `calibration/vehicle.json` mit diesen Parametern:
 
 `--plot` speichert einen Vergleich Messung/Simulation. Der Restfehler (RMS) sollte im
 Bereich weniger Millimeter liegen.
+
+### 4. Agent trainieren (nur Simulation, keine Hardware nötig)
+
+```bash
+python -m carrera_rl.train --algo sac --steps 300000 --out models_rl/sac_v1
+tensorboard --logdir models_rl                       # Lernkurven
+python -m carrera_rl.evaluate models_rl/sac_v1/best_model.zip
+```
+
+Die Umgebung (`env.py`) nutzt `calibration/vehicle.json`. Der Agent entscheidet 30-mal pro
+Sekunde über das Gas (0–50 %) und sieht dabei Geschwindigkeit, Position, die Kurven bis 80 cm
+voraus und seine letzten Entscheidungen. Belohnt wird die zurückgelegte Strecke, ein Abflug
+wird bestraft. Jede Episode variiert die Fahrzeugparameter leicht (`sim.Randomization`),
+weil das Modell die echte Bahn nur auf ~5 % genau trifft.
+
+Messlatte: Die beste konstante Gasstufe schafft 2,36 s pro Runde (echt, 44 %).
 
 ## Ohne Hardware ausprobieren
 

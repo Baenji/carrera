@@ -150,31 +150,49 @@ class Track:
         lateral = dx * np.sin(h) - dy * np.cos(h)
         return float(np.mod(s + along, self.length)), float(lateral)
 
+    def project_many(self, xy):
+        """Vektorisierte Version von project für viele Punkte (N, 2) -> (s, lateral)."""
+        from scipy.spatial import cKDTree
+        if not hasattr(self, "_tree"):
+            self._tree = cKDTree(self._dense_xy)
+        xy = np.asarray(xy, dtype=float)
+        _, i = self._tree.query(xy)
+        s = self._dense_s[i]
+        h = self.heading(s)
+        d = xy - self._dense_xy[i]
+        along = d[:, 0] * np.cos(h) + d[:, 1] * np.sin(h)
+        lateral = d[:, 0] * np.sin(h) - d[:, 1] * np.cos(h)
+        return np.mod(s + along, self.length), lateral
+
     def sample(self, ds=5.0):
         """Gleichmäßig abgetastete Spur: s, x, y, Krümmung."""
         s = np.arange(0.0, self.length, ds)
         x, y = self.position(s)
         return s, x, y, self.curvature(s)
 
-    def rails(self, ds=2.0, rail_offset=5.5, lane_offset=LANE_OFFSET):
+    def lateral_points(self, offsets, ds=2.0):
         """
-        Punkte auf allen Schienen und Schlitzen beider Spuren (für die
-        Kamera-Kalibrierung). Liefert (rails_xy, slots_xy).
+        Punkte parallel zur Fahrbahnmitte im seitlichen Abstand offsets
+        (mm, positiv = rechts in Fahrtrichtung). Weil Spuren und Fahrbahnränder
+        konzentrische Kreise sind, ist die Verschiebung entlang der Normalen exakt.
         """
-        d_self = lane_offset if self.lane == "right" else -lane_offset
+        d_self = LANE_OFFSET if self.lane == "right" else -LANE_OFFSET
         s = np.arange(0.0, self.length, ds)
         x, y = self.position(s)
         h = self.heading(s)
         nx, ny = np.sin(h), -np.cos(h)  # Normale nach rechts
-        rails, slots = [], []
-        for lane_d in (lane_offset, -lane_offset):
-            off = lane_d - d_self  # Versatz relativ zur gewählten Spur
-            slots.append(np.stack([x + off * nx, y + off * ny], 1))
-            for r in (-rail_offset, rail_offset):
-                rails.append(np.stack([x + (off + r) * nx, y + (off + r) * ny], 1))
-        # Bögen der jeweils anderen Spur haben einen anderen Radius; die Normalen-
-        # Verschiebung bildet das exakt ab, weil Spuren konzentrische Kreise sind.
-        return np.concatenate(rails), np.concatenate(slots)
+        return np.concatenate([np.stack([x + (o - d_self) * nx, y + (o - d_self) * ny], 1)
+                               for o in offsets])
+
+    def rails(self, ds=2.0, rail_offset=5.5):
+        """Punkte auf allen Schienen und Schlitzen beider Spuren: (rails_xy, slots_xy)."""
+        lanes = (LANE_OFFSET, -LANE_OFFSET)
+        rails = self.lateral_points([l + r for l in lanes for r in (-rail_offset, rail_offset)], ds)
+        return rails, self.lateral_points(lanes, ds)
+
+    def body(self, ds=4.0):
+        """Punkte auf der dunklen Fahrbahn und knapp daneben: (innen_xy, außen_xy)."""
+        return self.lateral_points([-40, -20, 0, 20, 40], ds), self.lateral_points([-85, 85], ds)
 
     def piece_centers(self):
         """Mittelpunkt (auf der Fahrbahnmitte) jedes Streckenteils + Teile-Code."""

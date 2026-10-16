@@ -1,0 +1,93 @@
+{
+  "args": {
+    "program": "steps",
+    "calib": "calibration/camera.json",
+    "out": "data/runs",
+    "cam_index": 0,
+    "fps": 60,
+    "baud": 115200,
+    "port": "/dev/cu.usbmodem1301",
+    "max_throttle": 40.0,
+    "min_throttle": 28.0,
+    "probe_start": 20,
+    "probe_step": 2,
+    "probe_laps": 3,
+    "hold": 3.0,
+    "repeats": 3,
+    "duration": 120,
+    "seed": 0,
+    "max_lateral": 40,
+    "lost_timeout": 0.3,
+    "wait_enter": false,
+    "show": false
+  },
+  "layout": [
+    "S",
+    "R",
+    "R",
+    "L",
+    "G",
+    "L",
+    "R",
+    "R",
+    "G",
+    "g",
+    "R",
+    "G",
+    "G",
+    "G",
+    "R",
+    "G"
+  ],
+  "lane": "right",
+  "track_length_mm": 4249.7785938008,
+  "calibration": {
+    "H_model_to_image": [
+      [
+        0.7738708660924546,
+        -0.0230377227074169,
+        1120.193002759262
+      ],
+      [
+        -0.009942780758979001,
+        -0.7823811533526124,
+        478.9832720953912
+      ],
+      [
+        1.1158234874845398e-06,
+        -2.043293107516074e-05,
+        1.0165512058753918
+      ]
+    ],
+    "k1": 0.0,
+    "layout": [
+      "S",
+      "R",
+      "R",
+      "L",
+      "G",
+      "L",
+      "R",
+      "R",
+      "G",
+      "g",
+      "R",
+      "G",
+      "G",
+      "G",
+      "R",
+      "G"
+    ],
+    "lane": "right",
+    "image_size": [
+      1280,
+      720
+    ],
+    "n_tags": 16,
+    "tag_fit_rms_px": 0.5329188301462975,
+    "tag_alignment_error_mm": 13.10854097905718,
+    "slot_fit_rms_px": 0.6426579839661052,
+    "slot_fit_rms_mm": 0.8426518223530441,
+    "slot_points_found": 0.9327375352775165
+  }
+}

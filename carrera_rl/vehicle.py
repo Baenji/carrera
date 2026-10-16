@@ -6,17 +6,24 @@ Geschwindigkeit v. Das Modell hat wenige, physikalisch deutbare Parameter,
 die per Systemidentifikation (sysid.py) aus echten Fahrten bestimmt werden:
 
     u_eff(t) = u(t - delay)                                 Verzögerung
+    du_f/dt  = (u_eff - u_f) / tau_u                       Glättung (Motorstrom baut sich auf)
     v_ss(u)  = v_max * clip((u - u0) / (100 - u0), 0, 1)^gamma   Kennlinie
-    dv/dt    = (v_ss - v) / tau          tau = tau_up oder tau_down
-               - curve_drag * |kappa| * v^2                 Reibung in Kurven
+    supply(s)= 1 - supply_drop * 4 x (1 - x),  x = Abstand zur Einspeisung / Rundenlänge
+               (Spannungsabfall in den Schienen, am größten gegenüber der Anschlussschiene)
+    piece(s) = Korrekturfaktor des Streckenteils (aus den Daten; Übergänge, Kontakte, ...)
+    dv/dt    = (v_ss(u_f) * supply * piece - v) / tau     tau = tau_up oder tau_down
+               - curve_drag * |kappa| * (|kappa| * R_REF)^(curve_exp - 1) * v^2   Reibung in Kurven
     Abflug, wenn v^2 * |kappa| > a_lat_max
 
 Einheiten: mm, s, Gas u in Prozent (0-100).
 """
 import json
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 
 import numpy as np
+
+R_REF = 171.0   # Bezugsradius für curve_exp (Fahrbahnmitte einer 90°-Kurve)
+FEED_S = 57.0   # Einspeisung: Mitte der Anschlussschiene
 
 
 @dataclass
@@ -27,6 +34,10 @@ class VehicleParams:
     tau_up: float = 0.15        # Zeitkonstante Beschleunigen (s)
     tau_down: float = 0.25      # Zeitkonstante Abbremsen (s)
     curve_drag: float = 0.0     # zusätzliche Bremswirkung in Kurven (dimensionslos)
+    curve_exp: float = 1.0      # wie stark die Kurvenbremse vom Radius abhängt (1 = proportional zu 1/r)
+    supply_drop: float = 0.0    # Geschwindigkeitsverlust durch Spannungsabfall, gegenüber der Einspeisung
+    piece_factor: list = field(default_factory=list)  # Korrektur je Streckenteil (leer = überall 1)
+    tau_u: float = 0.0          # Glättung des Gassignals (s), 0 = aus
     delay: float = 0.08         # Gesamtverzögerung Kamera + Rechner + Arduino + Motor (s)
     a_lat_max: float = 40000.0  # maximale Querbeschleunigung vor dem Abflug (mm/s^2)
 
@@ -55,12 +66,24 @@ def step(params, track, s, v, u_eff, dt):
         (s, v, a_lat): neue Position, neue Geschwindigkeit, Querbeschleunigung
     """
     kappa = np.abs(track.curvature(s))
-    v_target = params.v_ss(u_eff)
+    x = np.mod(s - FEED_S, track.length) / track.length
+    v_target = params.v_ss(u_eff) * (1.0 - params.supply_drop * 4.0 * x * (1.0 - x))
+    if len(params.piece_factor):
+        v_target = v_target * np.asarray(params.piece_factor)[track.segment_index(s)]
     tau = np.where(v_target > v, params.tau_up, params.tau_down)
-    dv = (v_target - v) / tau - params.curve_drag * kappa * v * v
+    with np.errstate(divide="ignore", invalid="ignore"):
+        shape = np.where(kappa > 0, (kappa * R_REF) ** (params.curve_exp - 1.0), 0.0)
+    dv = (v_target - v) / tau - params.curve_drag * kappa * shape * v * v
     v = np.maximum(v + dv * dt, 0.0)
     s = s + v * dt
     return s, v, v * v * kappa
+
+
+def smooth(params, u_f, u, dt):
+    """Glättung des (verzögerten) Gassignals erster Ordnung."""
+    if params.tau_u <= 0:
+        return u
+    return u_f + (u - u_f) * min(dt / params.tau_u, 1.0)
 
 
 def command_at(t_cmd, u_cmd, t):
@@ -91,9 +114,10 @@ def simulate(params, track, t_cmd, u_cmd, t_start, t_eval, s0, v0, dt=0.002):
     n_steps = int(np.ceil(np.nanmax(t_eval - t_start[:, None]) / dt)) + 1
     s_hist = np.empty((len(s), n_steps + 1))
     s_hist[:, 0] = s
+    u_f = command_at(t_cmd, u_cmd, t_start - params.delay - 3 * params.tau_u)
     for k in range(n_steps):
-        u = command_at(t_cmd, u_cmd, t_start + k * dt - params.delay)
-        s, v, a_lat = step(params, track, s, v, u, dt)
+        u_f = smooth(params, u_f, command_at(t_cmd, u_cmd, t_start + k * dt - params.delay), dt)
+        s, v, a_lat = step(params, track, s, v, u_f, dt)
         s_hist[:, k + 1] = s
         a_peak = np.maximum(a_peak, a_lat)
 
@@ -119,6 +143,8 @@ def simulate_trajectory(params, track, t_cmd, u_cmd, t_end, s0=0.0, v0=0.0, dt=0
     v = np.empty(n + 1)
     a = np.zeros(n + 1)
     s[0], v[0] = s0, v0
+    u_f = u[0]
     for k in range(n):
-        s[k + 1], v[k + 1], a[k + 1] = step(params, track, s[k], v[k], u[k], dt)
+        u_f = smooth(params, u_f, u[k], dt)
+        s[k + 1], v[k + 1], a[k + 1] = step(params, track, s[k], v[k], u_f, dt)
     return t, s, v, a

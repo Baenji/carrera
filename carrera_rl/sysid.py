@@ -23,11 +23,11 @@ import numpy as np
 from scipy.optimize import least_squares, minimize_scalar
 
 from .track import Track
-from .vehicle import VehicleParams, simulate
+from .vehicle import VehicleParams, command_at, simulate
 
-FIT_NAMES = ["v_max", "u0", "gamma", "tau_up", "tau_down", "curve_drag"]
-LOWER = [300.0, 0.0, 0.3, 0.01, 0.01, 0.0]
-UPPER = [10000.0, 60.0, 3.0, 2.0, 3.0, 3.0]
+FIT_NAMES = ["v_max", "u0", "gamma", "tau_up", "tau_down", "curve_drag", "curve_exp", "supply_drop", "tau_u"]
+LOWER = [300.0, 0.0, 0.2, 0.01, 0.01, 0.0, 0.0, 0.0, 0.0]
+UPPER = [10000.0, 60.0, 3.0, 2.0, 3.0, 3.0, 4.0, 0.6, 1.0]
 
 
 @dataclass
@@ -43,8 +43,13 @@ class Run:
     name: str = ""
 
 
-def load_run(run_dir):
-    """Liest eine mit record.py aufgezeichnete Fahrt."""
+def load_run(run_dir, calib=None, max_lateral=40.0):
+    """
+    Liest eine mit record.py aufgezeichnete Fahrt.
+
+    Ist calib (CameraCalibration) angegeben, werden die Positionen aus den
+    gespeicherten Pixeln neu berechnet, z.B. nach einer Parallaxe-Korrektur.
+    """
     with open(os.path.join(run_dir, "meta.json")) as f:
         meta = json.load(f)
     track = Track(meta["layout"], lane=meta["lane"])
@@ -57,6 +62,15 @@ def load_run(run_dir):
     cmds = read("commands.csv")
     events = read("events.csv")
     num = lambda x: float(x) if x not in ("", "nan") else np.nan
+    if calib is not None and any(r["px"] for r in frames):  # künstliche Fahrten haben keine Pixel
+        px = np.array([[num(r["px"]), num(r["py"])] for r in frames])
+        ok = np.isfinite(px).all(1) & np.array([r["detected"] == "1" for r in frames])
+        s_new = np.full(len(frames), np.nan)
+        lat = np.full(len(frames), np.nan)
+        if ok.any():
+            s_new[ok], lat[ok] = calib.pixels_to_track(px[ok])
+        for r, sv, ok_i in zip(frames, s_new, ok & (np.abs(lat) < max_lateral)):
+            r["s"], r["detected"] = (f"{sv}" if ok_i else "nan"), ("1" if ok_i else "0")
     return Run(
         track=track,
         t=np.array([num(r["t"]) for r in frames]),
@@ -111,8 +125,13 @@ def local_velocity(t, s, half=3):
     return v
 
 
-def make_windows(run, window=1.2, stride=0.6, n_init=5):
-    """Zeitfenster für die Anpassung: Startzustand + Messpunkte."""
+def make_windows(run, window=1.2, stride=0.6, n_init=5, min_throttle=26.0):
+    """
+    Zeitfenster für die Anpassung: Startzustand + Messpunkte.
+    Fenster, in denen das Gas unter min_throttle liegt, werden übersprungen: dort
+    ruckelt das Auto (Haftreibung, Schienenübergänge), und zum Rennen ist der
+    Bereich ohnehin irrelevant.
+    """
     starts, evals, meas, s0s, v0s = [], [], [], [], []
     for part, s_unw in continuous_segments(run):
         t = run.t[part]
@@ -121,6 +140,10 @@ def make_windows(run, window=1.2, stride=0.6, n_init=5):
             j = np.searchsorted(t, t[i] + window, side="right")
             if j - i < n_init + 5:
                 break
+            u_win = command_at(run.t_cmd, run.u_cmd, t[i:j] - 0.3)  # inkl. Vorlauf (Verzögerung)
+            if u_win.min() < min_throttle:
+                i = np.searchsorted(t, t[i] + stride)
+                continue
             # Startzustand: quadratischer Fit über die ersten Bilder
             tt = t[i:i + n_init] - t[i]
             c = np.polyfit(tt, s_unw[i:i + n_init], 2)
@@ -200,6 +223,41 @@ def fit_params(runs, base=None, dt=0.004, delay_range=(0.0, 0.3), verbose=True):
     return params, info
 
 
+PIECE_STAGE_NAMES = ["tau_up", "tau_down", "curve_drag", "curve_exp", "tau_u"]
+
+
+def fit_piece_factors(runs, params, dt=0.004, verbose=True):
+    """
+    Zweite Stufe: ein Korrekturfaktor je Streckenteil (plus Dynamik-Parameter),
+    bei fester Verzögerung, Kennlinie und Spannungsabfall.
+    """
+    data = [(run, w) for run in runs if (w := make_windows(run)) is not None]
+    n_pieces = len(runs[0].track.segments)
+    lo = [LOWER[FIT_NAMES.index(n)] for n in PIECE_STAGE_NAMES] + [0.6] * n_pieces
+    hi = [UPPER[FIT_NAMES.index(n)] for n in PIECE_STAGE_NAMES] + [1.4] * n_pieces
+    x0 = [getattr(params, n) for n in PIECE_STAGE_NAMES] + list(params.piece_factor or [1.0] * n_pieces)
+
+    def unpack(x):
+        return replace(params, piece_factor=[float(v) for v in x[len(PIECE_STAGE_NAMES):]],
+                       **{n: float(v) for n, v in zip(PIECE_STAGE_NAMES, x)})
+
+    def res(x):
+        p = unpack(x)
+        out = []
+        for run, w in data:
+            s_sim, _ = simulate(p, run.track, run.t_cmd, run.u_cmd, w["t_start"], w["t_eval"], w["s0"], w["v0"], dt=dt)
+            r = s_sim - w["s_meas"]
+            out.append(r[np.isfinite(r)])
+        return np.concatenate(out)
+
+    sol = least_squares(res, np.clip(x0, lo, hi), bounds=(lo, hi), x_scale="jac", loss="soft_l1",
+                        f_scale=10.0, max_nfev=40, verbose=0)
+    rms = float(np.sqrt(np.mean(sol.fun ** 2)))
+    if verbose:
+        print(f"  mit Streckenteil-Faktoren: RMS={rms:6.2f} mm")
+    return unpack(sol.x), rms
+
+
 def estimate_crash_limit(runs):
     """
     Querbeschleunigung bei Abflügen und höchste überlebte Querbeschleunigung.
@@ -242,21 +300,83 @@ def estimate_crash_limit(runs):
     return out
 
 
+def held_levels(run, min_laps=1.0):
+    """Gasstufen, die mindestens min_laps Runden lang konstant gehalten wurden (ohne Abflug)."""
+    L = run.track.length
+    out = []
+    for part, s_unw in continuous_segments(run):
+        t = run.t[part]
+        u = command_at(run.t_cmd, run.u_cmd, t)
+        for lvl in np.unique(u):
+            m = u == lvl
+            if m.sum() > 2 and (s_unw[m].max() - s_unw[m].min()) >= min_laps * L:
+                out.append(float(lvl))
+    return sorted(set(out))
+
+
+def peak_lateral(params, track, u, laps=3):
+    """Größte Querbeschleunigung des Modells bei konstantem Gas u (nach dem Einschwingen)."""
+    from .vehicle import simulate_trajectory
+    p = replace(params, a_lat_max=np.inf)
+    t, s, v, a = simulate_trajectory(p, track, [0.0], [u], t_end=laps * track.length / max(p.v_ss(u), 300.0) + 3.0)
+    return float(a[s > s[-1] - track.length].max())  # letzte Runde
+
+
+def estimate_crash_limit_model(runs, params):
+    """
+    Abfluggrenze so, dass das MODELL bei denselben konstanten Gasstufen überlebt bzw.
+    abfliegt wie das echte Auto. Damit passt die Grenze zu den Geschwindigkeiten des
+    Modells (auch dort, wo das Modell etwas zu schnell oder zu langsam ist).
+    """
+    survived, crashed = [], []
+    for run in runs:
+        survived += held_levels(run)
+        for t_c, _ in run.crashes:
+            crashed.append(float(command_at(run.t_cmd, run.u_cmd, np.array([t_c - 0.4]))[0]))
+    if not survived:
+        return {}
+    track = runs[0].track
+    u_s = max(survived)
+    a_s = peak_lateral(params, track, u_s)
+    out = {"survived_throttle": u_s, "a_lat_model_survived": a_s}
+    crashed = [u for u in crashed if u > u_s]
+    if crashed:
+        u_c = min(crashed)
+        a_c = peak_lateral(params, track, u_c)
+        out.update(crash_throttle=u_c, a_lat_model_crash=a_c, a_lat_max_estimate=0.5 * (a_s + a_c))
+    else:
+        out["a_lat_max_estimate"] = 1.02 * a_s  # nur untere Schranke bekannt
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("runs", nargs="+", help="Ordner aus data/runs/")
     ap.add_argument("--out", default="calibration/vehicle.json")
     ap.add_argument("--plot", action="store_true", help="Vergleich Messung/Simulation als PNG speichern")
+    ap.add_argument("--piece-factors", action="store_true",
+                    help="zusätzlich einen Korrekturfaktor je Streckenteil anpassen (braucht mehrere Fahrten)")
+    ap.add_argument("--calib", default="calibration/camera.json",
+                    help="Positionen mit dieser Kamera-Kalibrierung neu berechnen ('' = gespeicherte Werte nutzen)")
     args = ap.parse_args()
 
-    runs = [load_run(r) for r in args.runs]
+    calib = None
+    if args.calib and os.path.exists(args.calib):
+        from .camera_calib import CameraCalibration
+        calib = CameraCalibration(args.calib)
+    runs = [load_run(r, calib) for r in args.runs]
     print(f"{len(runs)} Fahrten geladen. Passe Parameter an ...")
     params, info = fit_params(runs)
-    crash = estimate_crash_limit(runs)
+    if args.piece_factors:
+        params, info["rms_mm"] = fit_piece_factors(runs, params)
+    crash = estimate_crash_limit_model(runs, params)
+    crash["from_last_frames"] = estimate_crash_limit(runs)  # alte Methode, nur zur Info
     if crash.get("a_lat_max_estimate"):
         params = replace(params, a_lat_max=crash["a_lat_max_estimate"])
     else:
-        print("WARNUNG: kein Abflug in den Daten, a_lat_max bleibt auf dem Standardwert. probe-Fahrt aufnehmen!")
+        print("WARNUNG: keine konstant gefahrene Gasstufe gefunden, a_lat_max bleibt auf dem Standardwert. probe-Fahrt aufnehmen!")
+    if "crash_throttle" not in crash:
+        print("Hinweis: kein Abflug oberhalb der gehaltenen Stufen, a_lat_max ist nur eine untere Schranke.")
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     params.save(args.out)
@@ -266,7 +386,7 @@ def main():
 
     print("\nErgebnis:")
     for k, v in asdict(params).items():
-        print(f"  {k:12s} = {v:.4g}")
+        print(f"  {k:12s} = " + (" ".join(f"{x:.2f}" for x in v) if isinstance(v, list) else f"{v:.4g}"))
     print(f"  Restfehler (RMS) = {info['rms_mm']:.1f} mm über {info['n_windows']} Fenster")
     print("  Endgeschwindigkeit: " + ", ".join(f"{u}%: {params.v_ss(u) / 1000:.2f} m/s" for u in (30, 50, 70, 100)))
     if args.plot:

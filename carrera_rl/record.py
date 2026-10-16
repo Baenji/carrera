@@ -27,6 +27,7 @@ from datetime import datetime
 
 import numpy as np
 
+from .camera import DEFAULT_FPS, DEFAULT_INDEX, find_car, open_camera
 from .camera_calib import CameraCalibration
 
 KEEPALIVE_S = 0.1  # Firmware-Watchdog schaltet nach 0.5 s ohne Befehl ab
@@ -103,6 +104,36 @@ class PrbsProgram:
         return True
 
 
+def wait_for_car(cap, calib, roi, args, keepalive, still_s=2.0, still_mm=5.0, timeout=180.0):
+    """Wartet, bis das Auto still_s Sekunden ruhig auf der Spur steht (nach dem Wiedereinsetzen)."""
+    print(f"Bitte Auto auf die Spur setzen. Es geht automatisch weiter, sobald es {still_s:.0f} s ruhig steht.")
+    t0 = time.perf_counter()
+    t_still, s_ref, t_keep = None, None, 0.0
+    while time.perf_counter() - t0 < timeout:
+        ok, frame = cap.read()
+        t = time.perf_counter()
+        if t - t_keep > KEEPALIVE_S:
+            keepalive()
+            t_keep = t
+        if not ok:
+            continue
+        pos, _ = find_car(frame, roi)
+        if pos is None:
+            t_still = None
+            continue
+        s, lateral = calib.pixel_to_track(*pos)
+        if abs(lateral) > args.max_lateral:
+            t_still = None
+            continue
+        if t_still is None or abs(s - s_ref) > still_mm:  # neu auf der Spur oder bewegt
+            s_ref, t_still = s, t
+            continue
+        if t - t_still >= still_s:
+            print("Auto erkannt, weiter geht's.")
+            return True
+    return False
+
+
 def make_program(args):
     if args.program == "probe":
         return ProbeProgram(args.probe_start, args.probe_step, args.probe_laps, args.max_throttle)
@@ -121,6 +152,8 @@ def main():
     ap.add_argument("--program", choices=["probe", "steps", "prbs"], required=True)
     ap.add_argument("--calib", default="calibration/camera.json")
     ap.add_argument("--out", default="data/runs")
+    ap.add_argument("--cam-index", type=int, default=DEFAULT_INDEX)
+    ap.add_argument("--fps", type=int, default=DEFAULT_FPS)
     ap.add_argument("--baud", type=int, default=115200, help="115200 für carrera_pwm_fast, 9600 für alte Firmware")
     ap.add_argument("--port", default=None, help="Serieller Port des Arduino (Standard: automatisch)")
     ap.add_argument("--max-throttle", type=float, default=None, help="Standard: 100 bei probe, sonst 50")
@@ -134,15 +167,14 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--max-lateral", type=float, default=40, help="mm Abstand zur Spur, ab dem das Auto als 'neben der Spur' gilt")
     ap.add_argument("--lost-timeout", type=float, default=0.3, help="s ohne Auto auf der Spur = Abflug")
+    ap.add_argument("--wait-enter", action="store_true", help="nach Abflug auf Enter warten statt automatisch")
     ap.add_argument("--show", action="store_true", help="Kamerabild anzeigen (kostet Rechenzeit)")
     args = ap.parse_args()
     if args.max_throttle is None:
         args.max_throttle = 100.0 if args.program == "probe" else 50.0
 
-    # Vorhandene Bausteine der Vorgruppe wiederverwenden
     import cv2
-    from src.camera import CarTracker, initialize_camera
-    from src.hardware.arduino import ArduinoInterface
+    from src.hardware.arduino import ArduinoInterface  # serielle Ansteuerung der Vorgruppe
 
     calib = CameraCalibration(args.calib)
     track = calib.track
@@ -163,9 +195,9 @@ def main():
     w_cmds.writerow(["t", "u"])
     w_events.writerow(["t", "type", "s", "info"])
 
-    cap = initialize_camera()
-    if cap is None:
-        raise SystemExit("Keine Kamera gefunden")
+    roi = calib.track_region()
+    width, height = calib.data["image_size"]
+    cap = open_camera(args.cam_index, width, height, args.fps)  # gleiche Auflösung wie bei der Kalibrierung
     arduino = ArduinoInterface(port=args.port, baudrate=args.baud)
 
     t0 = time.perf_counter()
@@ -194,7 +226,7 @@ def main():
                 continue
             n_frames += 1
 
-            pos, _ = CarTracker.find_car(frame)
+            pos, _ = find_car(frame, roi)
             s = lateral = np.nan
             on_track = False
             if pos is not None:
@@ -220,9 +252,13 @@ def main():
                 if not program.on_crash(t - t_pause):
                     break
                 t_wait = now()
-                input("Auto auf die Spur setzen und Enter drücken ...")
-                for _ in range(10):  # alte Bilder aus dem Kamerapuffer verwerfen
-                    cap.read()
+                if args.wait_enter:
+                    input("Auto auf die Spur setzen und Enter drücken ...")
+                    for _ in range(10):  # alte Bilder aus dem Kamerapuffer verwerfen
+                        cap.read()
+                elif not wait_for_car(cap, calib, roi, args, keepalive=lambda: send(0)):
+                    print("Auto wurde nicht wieder eingesetzt. Abbruch.")
+                    break
                 t_pause += now() - t_wait
                 w_events.writerow([f"{now():.4f}", "resume", "", ""])
                 last_seen, last_s = now(), None
@@ -232,12 +268,12 @@ def main():
                 send(u)
 
             w_frames.writerow([f"{t:.4f}", u_sent, int(on_track),
-                               "" if pos is None else pos[0], "" if pos is None else pos[1],
+                               "" if pos is None else f"{pos[0]:.1f}", "" if pos is None else f"{pos[1]:.1f}",
                                f"{s:.1f}", f"{lateral:.1f}"])
 
             if args.show and n_frames % 3 == 0:
                 if pos is not None:
-                    cv2.circle(frame, pos, 12, (0, 255, 0) if on_track else (0, 0, 255), 3)
+                    cv2.circle(frame, (int(pos[0]), int(pos[1])), 12, (0, 255, 0) if on_track else (0, 0, 255), 3)
                 cv2.putText(frame, f"u={u_sent:.0f} s={s:.0f} lap={laps}", (20, 40),
                             cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 2)
                 cv2.imshow("carrera_rl record", cv2.resize(frame, None, fx=0.5, fy=0.5))
