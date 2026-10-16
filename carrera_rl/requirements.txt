@@ -1,0 +1,7 @@
+numpy
+scipy
+opencv-python>=4.7      # enthält cv2.aruco für die AprilTag-Erkennung
+pyserial
+matplotlib              # nur für --plot
+pytest
+pupil-apriltags         # wird beim Import der alten src/-Module mitgeladen
