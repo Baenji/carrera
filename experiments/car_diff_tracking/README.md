@@ -1,55 +1,77 @@
-# Auto-Tracking per Hintergrund-Differenz
+# Auto-Tracking per Referenzbild-Differenz
 
-Experiment: Das Auto wird ohne Farbmarkierung erkannt. Stattdessen wird jedes Kamerabild mit einem
-Bild der leeren Strecke verglichen. Die größte Region mit Unterschieden gilt als Auto.
-Unabhängig vom alten Code in `src/tracking/`.
+Erkennt das Auto ohne Farbmarkierung: Jedes Kamerabild wird mit einem Bild der leeren Strecke
+verglichen. Die größte Region mit Unterschieden gilt als Auto, ihr Mittelpunkt wird als roter Punkt
+eingezeichnet.
+
+## Voraussetzungen
+
+- python: Python 3.11, OpenCV, NumPy
+- Kamera fest über der Strecke montiert (getestet mit Logitech Brio)
+- Linux oder Windows
 
 ## Starten
 
 ```bash
 conda activate carrera
-python experiments/car_diff_tracking/track_car.py              # Brio wird automatisch gefunden
-python experiments/car_diff_tracking/track_car.py --csv pos.csv  # Positionen mitloggen
+python experiments/car_diff_tracking/track_car.py
 ```
 
-1. Kein Auto auf der Strecke, keine Hand im Bild → **`b`** drücken (Hintergrund = Mittel aus 30 Frames)
-2. Auto aufsetzen, **`l`** drücken und 2 Runden von Hand fahren → Spurmaske wird gelernt und als
-   `track_mask.png` gespeichert (wird beim nächsten Start automatisch geladen)
-3. Fahren → roter Punkt = erkannter Schwerpunkt, gelb = Kontur, lila = Spur, grün = Spurmaske
+Die Logitech Brio Kamera wird automatisch gefunden. Unter Windows funktioniert das nur mit `pip install pygrabber`.
+Ohne das Paket wird Kamera 0 genommen, eine andere Kamera wählst du mit `--device 1`.
 
-Tasten: `b` Hintergrund neu · `l` Spurmaske lernen · `k` Spurmaske zeigen · `x` Spurmaske verwerfen ·
-`m` Differenzmaske · `t` Spur · `u` Hintergrund langsam nachführen · `+`/`-` Schwellwert · `s` Screenshot · `q` Ende
+## Benutzung
 
-## Spurmaske (Lernmodus)
+1. Skript starten und ca. 2 s warten. Belichtung, Weißabgleich und Fokus werden eingestellt und dann gesperrt.
+2. Auto von der Strecke nehmen, keine Hände oder Schatten im Bild → **`b`** drücken.
+   Das Referenzbild wird aus 30 Frames gemittelt.
+3. Auto aufsetzen und fahren. Der rote Punkt zeigt die erkannte Position.
 
-- Während des Lernens wird jede erkannte Auto-Silhouette aufsummiert. Pixel, die mindestens
-  `--min-hits` mal bedeckt waren, ergeben die Maske. Danach Lücken schließen, nur die größte Fläche
-  behalten und `--margin` px Rand zugeben.
-- Runde = Auto kommt nach genügend zurückgelegter Strecke wieder in die Nähe des Startpunkts.
-- Die Maske deckt nur die gefahrene Spur ab. Ein zweites Auto auf der anderen Spur stört deshalb nicht.
-- Beim Tracking wird das Differenzbild **nicht** beschnitten. Eine Region zählt nur, wenn
-  ≥ `--min-overlap` (70 %) davon auf der Maske liegen. Schatten und Hände neben der Strecke fallen raus,
-  der Punkt verrutscht nicht, wenn das Auto über den Rand ragt.
-- Kamera verschoben → Maske passt nicht mehr → neu lernen (`l`).
+| Taste | Funktion |
+|---|---|
+| `b` | Referenzbild (neu) aufnehmen, Strecke muss leer sein |
+| `m` | Differenzmaske anzeigen (weiß = anders als Referenz) |
+| `+` / `-` | Schwellwert erhöhen / verringern |
+| `q` / `ESC` | Beenden |
 
-## Pipeline
+## Optionen
 
-1. Belichtung, Weißabgleich und Fokus der Kamera einschwingen lassen und dann **sperren**.
-   Sonst regelt die Kamera nach, wenn das Auto ins Bild fährt, und das ganze Bild weicht vom Hintergrund ab.
-2. Frame auf 50 % verkleinern + Gauß-Blur (gegen Rauschen und JPEG-Artefakte)
-3. `absdiff` zum Hintergrund, Maximum über die BGR-Kanäle, Schwellwert
-4. Morphologie: Opening (Rauschen weg), Closing (Löcher im Auto schließen)
-5. Größte Kontur ≥ `--min-area` (mit Spurmaske: nur Konturen mit ≥ 70 % auf der Maske) → Schwerpunkt über Momente
+| Option | Standard | Bedeutung |
+|---|---|---|
+| `--device` | Brio automatisch | Kamera als Index oder Pfad |
+| `--width` / `--height` / `--fps` | 1280 / 720 / 60 | Kameramodus |
+| `--exposure` | von der Automatik | Feste Belichtung. Linux in 100 µs (`100` = 10 ms), Windows in log2 s (`-7` ≈ 8 ms) |
+| `--threshold` | 30 | Ab welcher Farbdifferenz (0–255) ein Pixel als verändert gilt |
+| `--min-area` | 300 | Mindestgröße (px) einer Region, um als Auto zu gelten |
+| `--blur` | 5 | Glättung gegen Rauschen |
+| `--scale` | 0.5 | Verkleinerung für die Verarbeitung (schneller) |
+| `--ref-frames` | 30 | Anzahl Frames für das Referenzbild |
 
-Rechenzeit ca. 1–2 ms pro Frame (1280×720), die Kamera liefert 60 fps.
+## Im eigenen Code verwenden
 
-## Bekannte Schwachstellen / Stellschrauben
+```python
+from track_car import DiffTracker
 
-- **Licht ändert sich** (Sonne, Deckenlicht) → mit `u` nachführen oder `b` neu aufnehmen
-- **Hand berührt das Auto** → beide verschmelzen zu einer Region mit wenig Anteil auf der Spur → kurz keine Erkennung
-- **Beide Autos nebeneinander** → können zu einer Region verschmelzen → kurz keine Erkennung
-- **Während des Lernens** sollte nichts anderes ins Bild greifen (dort gilt noch die größte Region)
-- **50-Hz-Flackern** von Leuchtstoffröhren/LEDs kann Streifen erzeugen → `--exposure 100` (10 ms) bzw. `200` testen
-- **Kamera wird angestoßen** → Hintergrund passt nicht mehr, `b` drücken
-- **Auto steht länger still** und `u` ist an → wird nicht eingelernt (Bereich wird ausgespart), Lichtdrift dort aber auch nicht
-- Schwellwert: zu niedrig = Rauschen/Schatten, zu hoch = dunkle Autoteile auf dunklem Asphalt fehlen
+tracker = DiffTracker(threshold=30, min_area=300, blur=5, scale=0.5)
+tracker.set_reference(frames_leere_strecke)   # Liste von BGR-Bildern
+center, mask = tracker.process(frame)         # center = (x, y) oder None
+```
+
+## Tipps und Grenzen
+
+- **Licht ändert sich** oder die **Kamera wurde bewegt** → `b` erneut drücken.
+- **Rauschen oder Schatten werden erkannt** → Schwellwert erhöhen (`+`).
+- **Teile des Autos fehlen in der Maske** → Schwellwert senken (`-`).
+- **Bild flackert** (50-Hz-Licht) → feste Belichtung setzen, z.B. `--exposure 100` (Linux).
+- Es wird immer die **größte** Veränderung genommen. Hände, Schatten oder ein zweites Auto, die größer
+  sind als das eigene Auto, werden stattdessen erkannt.
+
+## Advanced-Version (`track_car_advanced.py`)
+
+Gleiche Bedienung, zusätzlich:
+
+- **Spurmaske lernen (`l`)**: Du fährst 2 Runden, das Skript merkt sich die befahrene Spur und speichert
+  sie als `track_mask.png`. Danach zählen nur noch Veränderungen auf dieser Spur. Hände, Schatten neben
+  der Strecke und das Auto auf der anderen Spur werden ignoriert.
+- **Referenzbild nachführen (`u`)**: Das Referenzbild passt sich langsam an Lichtänderungen an.
+- **Fahrspur einzeichnen (`t`)**, **Screenshot (`s`)**, **Positionen als CSV loggen (`--csv datei.csv`)**.
