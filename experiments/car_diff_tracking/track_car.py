@@ -6,6 +6,9 @@ Ablauf:
   3. Auto aufsetzen und fahren lassen.
   4. Jeder Frame wird mit dem Referenzbild verglichen; die größte zusammenhängende
      Differenzregion = Auto. Ihr Schwerpunkt wird als Punkt eingezeichnet.
+  5. Das Referenzbild wird laufend langsam an das aktuelle Bild angeglichen, überall außer in
+     einem Kreis um die letzte Auto-Position. So verschwinden Schatten, Lichtänderungen und
+     neue Gegenstände nach ein paar Sekunden von selbst, das Auto brennt aber nicht ein.
 
 Tasten im Fenster:
   b  Referenzbild aufnehmen (Strecke muss leer sein!)
@@ -134,13 +137,50 @@ def read_frame(cap: cv2.VideoCapture) -> np.ndarray:
 # --------------------------------
 
 
+def largest_blob(
+    mask: np.ndarray, min_area: int, scale: float
+) -> tuple[tuple[int, int] | None, float]:
+    """Größte weiße Fläche in `mask` (verkleinertes Bild).
+
+    Gibt (Schwerpunkt, Fläche) in Originalkoordinaten zurück. Schwerpunkt ist None, wenn es keine
+    Fläche gibt oder die größte kleiner als `min_area` (px im Originalbild) ist.
+    """
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return None, 0.0
+    c = max(contours, key=cv2.contourArea)
+    m = cv2.moments(c)  # m00 = Fläche, m01 = Summe(y-coords), m10 = Summe(x-coords)
+    area = m["m00"] / scale**2
+    if area < min_area or m["m00"] == 0:
+        return None, area
+    center = (
+        int(round(m["m10"] / m["m00"] / scale)),  # durchschnittliche x-Koordinate
+        int(round(m["m01"] / m["m00"] / scale)),  # durchschnittliche y-Koordinate
+    )
+    return center, area
+
+
 class DiffTracker:
-    def __init__(self, threshold: int, min_area: int, blur: int, scale: float):
+    def __init__(
+        self,
+        threshold: int,
+        min_area: int,
+        blur: int,
+        scale: float,
+        ref_alpha: float,
+        protect_radius: int,
+    ):
         self.threshold = threshold
         self.min_area = min_area  # in Pixeln des Originalbilds
         self.blur = blur | 1  # muss ungerade sein
         self.scale = scale  # Verarbeitung auf verkleinertem Bild -> deutlich schneller
-        self.reference: np.ndarray | None = None
+        self.ref_alpha = ref_alpha  # Anpassungsrate des Referenzbilds pro Frame (0 = aus)
+        self.protect_radius = protect_radius  # Schutzkreis ums Auto (px im Originalbild)
+        self.reference: np.ndarray | None = None  # uint8, zum Vergleichen
+        # float32-Kopie fürs Nachführen: kleine Änderungen (alpha * Differenz < 0.5)
+        # würden in uint8 weggerundet und das Referenzbild würde sich nie bewegen
+        self.reference_f: np.ndarray | None = None
+        self.last_center: tuple[int, int] | None = None  # letzte bekannte Auto-Position
         self.kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         self.kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
 
@@ -154,8 +194,11 @@ class DiffTracker:
 
     def set_reference(self, frames: list[np.ndarray]) -> None:
         """Referenzbild = Mittelwert über Frames der leeren Strecke."""
-        mean = np.mean([self.prep(f).astype(np.float32) for f in frames], axis=0)
-        self.reference = cv2.convertScaleAbs(mean)
+        self.reference_f = np.mean(
+            [self.prep(f).astype(np.float32) for f in frames], axis=0
+        ).astype(np.float32)
+        self.reference = cv2.convertScaleAbs(self.reference_f)
+        self.last_center = None
 
     def process(self, frame: np.ndarray) -> tuple[tuple[int, int] | None, np.ndarray]:
         """Gibt (Mittelpunkt des Autos oder None, Differenzmaske in Originalauflösung) zurück."""
@@ -173,16 +216,27 @@ class DiffTracker:
             mask, cv2.MORPH_CLOSE, self.kernel_close
         )  # Löcher im Auto schließen
 
-        center = None
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if contours:
-            c = max(contours, key=cv2.contourArea)
-            m = cv2.moments(c) # m00 = Fläche, m01 = Summe(y-coords), m10 = Summe(x-coords)
-            if cv2.contourArea(c) >= self.min_area * self.scale**2 and m["m00"] > 0:
-                center = (
-                    int(round(m["m10"] / m["m00"] / self.scale)), # durchschnittliche x-Koordinate
-                    int(round(m["m01"] / m["m00"] / self.scale)), # durchschnittliche y-Koordinate
+        center, area = largest_blob(mask, self.min_area, self.scale)
+        # Geschützt wird nur, was in den Schutzkreis passt. Größere Flächen (Lichtwechsel,
+        # großer Schatten) können nicht das Auto sein. Würde man sie schützen, bliebe der
+        # Kreis selbst als Fläche stehen und würde sich für immer selbst schützen.
+        if center is not None and area <= np.pi * self.protect_radius**2:
+            self.last_center = center
+
+        if self.ref_alpha > 0:
+            # Referenz langsam an das aktuelle Bild angleichen (gleitender Mittelwert):
+            #   ref = (1 - alpha) * ref + alpha * aktuelles Bild
+            # Überall, außer in einem Kreis um die letzte Auto-Position. Wird das Auto gerade
+            # nicht erkannt (z.B. steht es), bleibt der Kreis an der letzten Position.
+            update = np.full(mask.shape, 255, np.uint8)
+            if self.last_center is not None:
+                c = (
+                    int(self.last_center[0] * self.scale),
+                    int(self.last_center[1] * self.scale),
                 )
+                cv2.circle(update, c, int(self.protect_radius * self.scale), 0, -1)
+            cv2.accumulateWeighted(cur, self.reference_f, self.ref_alpha, mask=update)
+            self.reference = cv2.convertScaleAbs(self.reference_f)
 
         if self.scale != 1.0:
             mask = cv2.resize(
@@ -261,6 +315,19 @@ def main() -> None:
     ap.add_argument(
         "--ref-frames", type=int, default=30, help="Anzahl Frames für das Referenzbild"
     )
+    ap.add_argument(
+        "--ref-alpha",
+        type=float,
+        default=0.05,
+        help="Anpassungsrate des Referenzbilds pro Frame (0 = aus). "
+        "0.005 ≈ 2 s Halbwertszeit bei 60 fps",
+    )
+    ap.add_argument(
+        "--protect-radius",
+        type=int,
+        default=70,
+        help="Radius (px) um die Auto-Position, in dem das Referenzbild NICHT angepasst wird",
+    )
     args = ap.parse_args()
 
     device = args.device if args.device is not None else find_brio()
@@ -268,7 +335,14 @@ def main() -> None:
     cap = open_camera(device, args.width, args.height, args.fps)
     lock_camera(cap, args.exposure)
 
-    tracker = DiffTracker(args.threshold, args.min_area, args.blur, args.scale)
+    tracker = DiffTracker(
+        args.threshold,
+        args.min_area,
+        args.blur,
+        args.scale,
+        args.ref_alpha,
+        args.protect_radius,
+    )
     show_mask = False
     cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
 

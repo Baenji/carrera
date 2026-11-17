@@ -27,6 +27,10 @@ Ohne das Paket wird Kamera 0 genommen, eine andere Kamera wählst du mit `--devi
    Das Referenzbild wird aus 30 Frames gemittelt.
 3. Auto aufsetzen und fahren. Der rote Punkt zeigt die erkannte Position.
 
+Während der Fahrt gleicht sich das Referenzbild laufend an das aktuelle Bild an, überall außer in einem
+Kreis um die letzte Auto-Position. Lichtänderungen, Schatten und neue Gegenstände verschwinden so nach
+2–4 s von selbst, das Auto (auch ein stehendes) brennt nicht ein. `b` bleibt der manuelle Reset.
+
 | Taste | Funktion |
 |---|---|
 | `b` | Referenzbild (neu) aufnehmen, Strecke muss leer sein |
@@ -46,20 +50,28 @@ Ohne das Paket wird Kamera 0 genommen, eine andere Kamera wählst du mit `--devi
 | `--blur` | 5 | Glättung gegen Rauschen |
 | `--scale` | 0.5 | Verkleinerung für die Verarbeitung (schneller) |
 | `--ref-frames` | 30 | Anzahl Frames für das Referenzbild |
+| `--ref-alpha` | 0.005 | Wie schnell sich das Referenzbild anpasst (`0` = aus). 0.005 ≈ 2 s Halbwertszeit bei 60 fps |
+| `--protect-radius` | 70 | Radius (px) um das Auto, in dem das Referenzbild nicht angepasst wird. Muss größer als das Auto sein |
 
 ## Im eigenen Code verwenden
 
 ```python
 from track_car import DiffTracker
 
-tracker = DiffTracker(threshold=30, min_area=300, blur=5, scale=0.5)
+tracker = DiffTracker(threshold=30, min_area=300, blur=5, scale=0.5, ref_alpha=0.005, protect_radius=70)
 tracker.set_reference(frames_leere_strecke)   # Liste von BGR-Bildern
 center, mask = tracker.process(frame)         # center = (x, y) oder None
 ```
 
 ## Tipps und Grenzen
 
-- **Licht ändert sich** oder die **Kamera wurde bewegt** → `b` erneut drücken.
+- **Licht ändert sich, Schatten, neuer Gegenstand** → verschwindet nach 2–4 s von selbst. In dieser Zeit
+  kann der Punkt falsch liegen.
+- **Kamera wurde bewegt** → `b` drücken (geht auch von selbst, dauert aber und ist währenddessen unbrauchbar).
+- **Stehender Gegenstand größer als das Auto, aber kleiner als der Schutzkreis** (z.B. eine Hand, die
+  liegen bleibt) kann sich als „Auto“ selbst schützen → `b` drücken.
+- **Zweites Auto bleibt lange stehen** → wird in die Referenz übernommen. Fährt es weg, bleibt dort kurz
+  (≈ 2 s) ein „Geist“.
 - **Rauschen oder Schatten werden erkannt** → Schwellwert erhöhen (`+`).
 - **Teile des Autos fehlen in der Maske** → Schwellwert senken (`-`).
 - **Bild flackert** (50-Hz-Licht) → feste Belichtung setzen, z.B. `--exposure 100` (Linux).
@@ -73,5 +85,4 @@ Gleiche Bedienung, zusätzlich:
 - **Spurmaske lernen (`l`)**: Du fährst 2 Runden, das Skript merkt sich die befahrene Spur und speichert
   sie als `track_mask.png`. Danach zählen nur noch Veränderungen auf dieser Spur. Hände, Schatten neben
   der Strecke und das Auto auf der anderen Spur werden ignoriert.
-- **Referenzbild nachführen (`u`)**: Das Referenzbild passt sich langsam an Lichtänderungen an.
 - **Fahrspur einzeichnen (`t`)**, **Screenshot (`s`)**, **Positionen als CSV loggen (`--csv datei.csv`)**.
