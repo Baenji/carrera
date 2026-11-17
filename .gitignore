@@ -5,3 +5,6 @@ venv/
 .DS_Store
 
 __pycache__/
+# Godot import cache
+.godot/
+*.egg-info/

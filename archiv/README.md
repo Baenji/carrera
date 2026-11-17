@@ -1,122 +1,159 @@
-# DS-Carrera-v1
+# Altprojekt (Vorjahresteam): Setup und Start
 
-Computer vision and reinforcement learning system for tracking and controlling a Carrera slot car racing track.
+Dieser Ordner enthält den Code des Vorjahresteams. Die Anleitung beschreibt, wie man ihn wieder zum Laufen bringt. Die frühere englische README ist teilweise veraltet und liegt noch in der Git-History.
 
-## Architecture (Refactored v2.0)
+Alle Befehle werden **aus `archiv/` heraus** ausgeführt, außer es steht etwas anderes dabei.
 
-The codebase has been refactored into a clean modular structure:
+## 1. Voraussetzungen
 
-### Project Structure
+| Was | Wofür |
+|---|---|
+| Python 3.11 | Tracking-App und RL-Training |
+| Godot 4.5 (`godot` muss im PATH liegen) | Simulator in `CarreraSimulator/` |
+| USB-Webcam über der Bahn | nur für den Betrieb mit der echten Bahn |
+| Arduino mit Firmware | nur zum Fahren auf der echten Bahn |
 
-```
-DS-Carrera-v1/
-├── quick_object_tracking.py   # Entry point (backward-compatible wrapper)
-├── src/                        # Main application package
-│   ├── config.py              # Configuration constants
-│   ├── main.py                # Main application class
-│   ├── camera/                # Camera initialization and color detection
-│   │   ├── camera_manager.py  # Platform-specific camera setup
-│   │   └── color_detector.py  # HSV-based car/reference tracking
-│   ├── tracking/              # AprilTag detection and track mapping
-│   │   ├── apriltag_detector.py  # AprilTag detection wrapper
-│   │   ├── track_mapper.py      # Complex track order mapping algorithm
-│   │   └── track_graph.py       # Progress calculation along track
-│   ├── network/               # Simulation communication
-│   │   └── network_client.py   # Non-blocking socket, JSON protocol, Arduino control
-│   └── hardware/              # Hardware interfaces
-│       └── arduino/           # Arduino serial communication
-├── launcher/                  # Multi-component launcher
-├── Documentation/             # Project documentation
-├── arduino_geschwindigkeit_skaliert/  # Arduino firmware
-├── simulator/                 # Godot simulator (untouched)
-├── CarreraSimulator/          # Godot RL simulator (untouched)
-└── archive/                   # Archived experimental code
-    ├── Carrera/              # Old virtual environment
-    ├── segmentation/         # Experimental segmentation approaches
-    ├── camera_test.py        # Camera debugging utility
-    └── carrera_anti_reflection.py  # Experimental track detection
-
-```
-
-### Module Responsibilities
-
-- **src.config**: All configuration constants (camera settings, colors, network, tag mappings)
-- **src.camera**: Platform-specific camera initialization and HSV color detection
-- **src.tracking**: AprilTag detection, complex track mapping algorithm with visualization, progress calculation
-- **src.network**: Non-blocking socket communication with Godot simulator, JSON protocol, Arduino signal control
-- **src.hardware**: Arduino serial interface for controlling track components
-- **src.main**: Main application orchestrator and event loop
-
-### Running the Application
+Unter macOS liegt Godot meist nicht im PATH. Abhilfe:
 
 ```bash
-# Direct execution
+alias godot="/Applications/Godot.app/Contents/MacOS/Godot"
+```
+
+## 2. Python-Umgebung
+
+```bash
+cd <repo-root>
+python3.11 -m venv .venv          # falls .venv noch nicht existiert
+source .venv/bin/activate
+pip install -e archiv
+pip install pyyaml                # braucht der Launcher, fehlt in requirements.txt
+pip install --no-deps "numpy==2.2.6"   # Modelle wurden mit NumPy 2 gespeichert, sonst: No module named 'numpy._core.numeric'
+
+cd archiv
+python -c "from src.config import TAG_MAP; print('ok')"
+```
+
+Zu den Versionen: godot-rl 0.8.2 erlaubt nur `stable-baselines3<=2.4.0`, und SB3 2.4.0 verlangt `numpy<2`. Die Modelle in `models/` lassen sich aber nur mit NumPy 2 laden. SB3 2.4.0 zusammen mit NumPy 2.2.6 funktioniert trotzdem. Die Warnung von `pip check` kann man ignorieren.
+
+**Welches Modell?** Der aktuelle Godot-Code liefert 3 Beobachtungswerte. Dazu passen nur `simmodel_better8` bis `simmodel_better11`. `rlmodel_good` und `simmodel_good` stammen von einer älteren Version mit 6 Werten und brechen mit `Observation spaces do not match` ab.
+
+Wurde `.venv` vor dem Verschieben nach `archiv/` mit `pip install -e .` eingerichtet, muss `pip install -e archiv` noch einmal laufen, sonst zeigt der editierbare Install auf den alten Pfad.
+
+## 3. Godot-Projekt einmalig importieren
+
+Der Import-Cache `CarreraSimulator/.godot/` ist nicht im Repo. Ohne ihn bricht `godot --path CarreraSimulator` mit `Unrecognized UID: "uid://b3axd7spkulbx"` ab. Einmalig (oder nach frischem Clone) ausführen:
+
+```bash
+godot --headless --path CarreraSimulator --import
+```
+
+Warnungen wie `invalid UID ... using text path instead` und ein `Pure virtual function called!` beim Beenden sind harmlos. Alternativ das Projekt einmal im Godot-Editor öffnen.
+
+## 4. Konfiguration prüfen
+
+In `src/config.py`:
+
+- `CAM_INDEX = 1` ist die Nummer der Webcam. Am Laptop ist `0` meist die eingebaute Kamera, die externe hat dann `1`.
+- `GREEN_*` und `YELLOW_*` sind die HSV-Schwellen für das Auto und die gelben Referenzpunkte. Bei anderem Licht müssen sie nachjustiert werden.
+- `SIMULATION_PORT = 11360` ist der TCP-Port von Godot.
+
+Unter macOS muss das Terminal Zugriff auf die Kamera haben (Systemeinstellungen → Datenschutz & Sicherheit → Kamera).
+
+Den Arduino findet `Network` automatisch (`usbmodem`/`COM`-Port, 9600 Baud). Ohne Arduino läuft die App einfach ohne ihn weiter.
+
+## 5. Die drei Prozesse
+
+| # | Prozess | Rolle | Verbindung |
+|---|---|---|---|
+| A | SB3-Trainingsskript | PPO-Agent | TCP-Server, wartet auf Godot |
+| B | Godot-Simulator | Umgebung bzw. Relais | Client zu A, Server auf Port 11360 für C |
+| C | Tracking-App | Kamera, Streckenerkennung, Arduino | Client zu B |
+
+**Die Startreihenfolge ist wichtig: A → B → C.** Godot versucht beim Start genau einmal, A zu erreichen. Klappt das nicht, beendet es sich mit `server disconnected status, closing` und `SCRIPT ERROR: ... _handshake (sync.gd:360)`. Terminal A erst starten und warten, bis `waiting for remote GODOT connection on port 11008` erscheint. Die Tracking-App verbindet sich ebenfalls nur einmal mit Godot und versucht es danach nicht erneut.
+
+Jeder Prozess läuft in einem eigenen Terminal, in dem vorher `source ../.venv/bin/activate` ausgeführt und nach `archiv/` gewechselt wurde.
+
+### Szenario 1: Echte Bahn, Modell fährt (3 Terminals)
+
+> ⚠️ **Vorher patchen:** In `CarreraSimulator/Singletons/network_manager.gd` steht `var SIMULATION_MODE: bool = true`, und ohne `--sim` setzt nichts den Wert auf `false`. Godot ignoriert dann Fortschritt und Crash-Meldungen von der Kamera. Für den Betrieb an der echten Bahn den Default auf `false` setzen.
+
+```bash
+# Terminal A: Agent (wartet, bis Godot sich verbindet)
+python CarreraSimulator/stable_baselines3_example.py \
+    --resume_model_path=models/simmodel_better11.zip --inference
+#   Weitertrainieren statt nur fahren:
+#   --resume_model_path=models/simmodel_better11.zip --save_model_path=models/rlmodel.zip --timesteps=1_000
+
+# Terminal B: Godot (ohne --sim, also RL-Modus)
+godot --path CarreraSimulator
+
+# Terminal C: Tracking-App
 python quick_object_tracking.py
-
-# Or using the launcher for full system
-cd launcher
-python launcher.py
 ```
 
-### Import as Module
+Danach:
 
-```python
-from src.camera import CarTracker
-from src.tracking import TrackRecognizer, TrackGraph
-from src.network import Network
-from src.main import QuickObjectTrackingApp
+1. Das Auto aufs Gleis stellen. Es sollte vorher stehen, denn die Spannung kommt sofort vom Modell.
+2. Im Kamerafenster warten, bis die AprilTags stabil erkannt werden (`STABLE_TAG_FRAMES`). Die App schickt dann die Streckenreihenfolge an Godot, und Godot baut die Strecke.
+3. **Achtung:** `track_mapper.py` sendet derzeit eine fest codierte Testreihenfolge statt der erkannten (`TODO: REMOVE HARDCODED TESTING VALUES`).
+4. Taste **G** schaltet den Track-Graph ein bzw. aus. Den Fortschritt sendet die App nur, solange der Graph sichtbar ist. **ESC** beendet die App.
 
-# Or use the backward-compatible imports
-from quick_object_tracking import CarTracker, TrackRecognizer, Network
-```
+### Szenario 2: Training rein in der Simulation (2 Terminals, keine Kamera)
 
-## Features
-
-- Real-time computer vision tracking using OpenCV
-- AprilTag-based track layout recognition
-- Automatic curve direction detection (left/right)
-- Progress tracking around the circuit
-- Non-blocking network communication with Godot simulator
-- Arduino integration for hardware control
-- Platform-specific camera support (Windows/macOS/Linux)
-- Inline track mapping visualization
-
-## Installation
-
-### Quick Start
-
-1. **Clone the repository**
 ```bash
-git clone https://github.com/your-org/DS-Carrera-v1.git
-cd DS-Carrera-v1
+# Terminal A
+python CarreraSimulator/stable_baselines3_example.py \
+    --timesteps=30_000 --save_model_path=models/simmodel.zip
+
+# Terminal B: --skip_start_screen nimmt eine fest codierte Strecke, ohne auf die Kamera zu warten
+godot --sim --skip_start_screen --path CarreraSimulator
 ```
 
-2. **Install the package** (recommended: use a virtual environment)
+Mit `--sim` statt `--skip_start_screen` wartet Godot auf eine Streckenreihenfolge von der Tracking-App (dann zusätzlich Terminal C, wie in Szenario 1). Alles andere von der Kamera wird ignoriert.
+
+Schneller trainieren geht mit einem exportierten Godot-Binary. Damit startet das Skript Godot selbst und braucht nur ein Terminal:
+
 ```bash
-# Install in development/editable mode
-pip install -e .
-
-# Or install from pyproject.toml
-pip install .
+python CarreraSimulator/stable_baselines3_example.py --env_path=<export-binary> \
+    --n_parallel=8 --speedup=32 --timesteps=500_000 --save_model_path=models/simmodel.zip
 ```
 
-This will install all dependencies and make the `src` package available for import.
+Ein Export liegt nicht im Repo. Er wird in Godot über Projekt → Exportieren erzeugt.
 
-### Manual Installation
+### Optional: TensorBoard (weiteres Terminal)
 
-If you prefer to install dependencies separately:
 ```bash
-pip install -r requirements.txt
+tensorboard --logdir=logs
 ```
 
-## Requirements
+## 6. Launcher (Alternative zu mehreren Terminals)
 
-See `requirements.txt` for Python dependencies:
-- opencv-python - Computer vision
-- pupil-apriltags - AprilTag detection
-- numpy - Numerical operations
-- pyserial - Arduino communication
-- godot-rl - Godot RL integration
-- stable-baselines3 - RL training
-- tensorflow - Deep learning
-- tensorboard - Training visualization
+`launcher/launcher.py` startet die Prozesse eines Profils aus `launcher/config.yaml` nacheinander mit `cwd = archiv/`. Ctrl+C beendet alle.
+
+```bash
+python launcher/launcher.py --list
+python launcher/launcher.py flex2      # Godot + Tracking
+```
+
+Einschränkungen:
+
+- Der Launcher startet Godot **vor** dem SB3-Skript. Läuft das Skript noch nicht, beendet sich Godot (siehe oben). Für die Profile mit Training ist es daher sicherer, die Prozesse von Hand zu starten.
+- Die Modellpfade in `config.yaml` zeigen auf den Repo-Root statt auf `models/`.
+- `sb-full-train` erwartet `CarreraSimulator/export/CarreraSim.exe` (Windows, nicht im Repo).
+- Das Profil `sim-retraining` verweist auf eine Komponente, die es nicht gibt, und bricht ab.
+
+## 7. Arduino testen
+
+```bash
+python src/hardware/arduino/Arduino.py
+```
+
+**Das Auto fährt dabei kurz mit 50 %!** Vorher sicher aufs Gleis stellen. Firmware gibt es in zwei Varianten: `arduino_geschwindigkeit_skaliert/scaled_pwm_controller/` (PWM auf Pin 11, Befehle `<0-100>\n` und `STATUS\n`) und `arduino_geschwindigkeit_skaliert/arduino_geschwindigkeit_skaliert.ino` (Digitalpoti MCP4151). Welche davon verbaut ist, ist noch nicht geklärt.
+
+## 8. Bekannte Probleme
+
+Die vollständige Liste steht in `.claude/CLAUDE.md` und in Notion (Wiki → „Bekannte Probleme“). Für den Betrieb am wichtigsten:
+
+- Die Beobachtung des Agenten ist praktisch leer (`discrete_progress_ratio` ist immer 0). Die mitgelieferten Modelle sind deshalb wenig aussagekräftig.
+- `TrackBuilder.gd` baut Start/Ziel sowie kurze und mittlere Geraden nicht.
+- Die Crash-Erkennung prüft effektiv nur die Geschwindigkeit.
