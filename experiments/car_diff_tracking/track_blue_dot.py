@@ -173,6 +173,15 @@ def lock_camera(
         print(f"[kamera] WARNUNG: konnte nicht sperren: {', '.join(failed)}")
 
 
+def exposure_ms(cap: cv2.VideoCapture) -> float | None:
+    """TEMPORÄR: aktuelle Belichtungszeit der Kamera in ms. macOS: nicht auslesbar -> None."""
+    if IS_MAC:
+        return None
+    v = cap.get(cv2.CAP_PROP_EXPOSURE)
+    # Windows: log2(Sekunden), Linux: Einheiten von 100 µs
+    return 2**v * 1000 if IS_WINDOWS else v / 10
+
+
 def read_frame(cap: cv2.VideoCapture) -> np.ndarray:
     ok, frame = cap.read()
     if not ok:
@@ -354,9 +363,19 @@ def main() -> None:
 
     cv2.setMouseCallback(WINDOW, on_click)
 
+    # TEMPORÄR: Belichtungszeit jede Sekunde ins Terminal loggen
+    last_log = 0.0
+    if IS_MAC:
+        print("[belichtung] auf macOS über OpenCV nicht auslesbar")
+
     try:
         while True:
             frame = read_frame(cap)
+
+            # TEMPORÄR: Belichtungszeit loggen
+            if not IS_MAC and time.perf_counter() - last_log >= 1.0:
+                last_log = time.perf_counter()
+                print(f"[belichtung] {exposure_ms(cap):.2f} ms")
             # Auf eine Kopie zeichnen, damit der Klick die echten Farben misst
             view = frame.copy()
 
