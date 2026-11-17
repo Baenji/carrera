@@ -46,10 +46,8 @@ import numpy as np
 WINDOW = "Blue Dot Tracking"
 
 # Farbbereich des blauen Punkts in HSV (OpenCV: H 0-179, S und V 0-255).
-# Kräftigerer Punkt, per Klick an 6 Stellen gemessen (Mac): H 106-108, S 240-255, V 104-188.
-# Untergrenzen großzügig, weil Bewegungsunschärfe S und V senkt. Per Klick ins Bild nachkalibrieren.
-BLUE_LOW = (100, 150, 60)
-BLUE_HIGH = (115, 255, 255)
+BLUE_LOW = (104, 110, 40)
+BLUE_HIGH = (118, 255, 255)
 
 IS_WINDOWS = sys.platform == "win32"
 IS_MAC = sys.platform == "darwin"
