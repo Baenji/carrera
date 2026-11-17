@@ -46,9 +46,10 @@ import numpy as np
 WINDOW = "Blue Dot Tracking"
 
 # Farbbereich des blauen Punkts in HSV (OpenCV: H 0-179, S und V 0-255).
-# Am Standbild gemessen: H 103-112, S 105-140, V 160-190. Per Klick ins Bild nachkalibrieren.
-BLUE_LOW = (95, 80, 100)
-BLUE_HIGH = (120, 255, 255)
+# Kräftigerer Punkt, per Klick an 6 Stellen gemessen (Mac): H 106-108, S 240-255, V 104-188.
+# Untergrenzen großzügig, weil Bewegungsunschärfe S und V senkt. Per Klick ins Bild nachkalibrieren.
+BLUE_LOW = (100, 150, 60)
+BLUE_HIGH = (115, 255, 255)
 
 IS_WINDOWS = sys.platform == "win32"
 IS_MAC = sys.platform == "darwin"
@@ -236,7 +237,7 @@ def find_blue_dot(
 ) -> tuple[tuple[int, int] | None, int, np.ndarray]:
     """Gibt (Mittelpunkt des blauen Punkts oder None, Radius in px, Blau-Maske) zurück.
 
-    frame:     BGR-Bild in Originalauflösung. Nicht verkleinern, der Punkt ist nur ~7 px groß.
+    frame:     BGR-Bild in Originalauflösung. Nicht verkleinern, der Punkt ist nur wenige Pixel groß.
     diff_mask: Differenzmaske vom DiffTracker in derselben Auflösung
     min_area:  Mindestanzahl blauer Pixel, damit einzelne Rauschpixel nicht als Punkt zählen
     """
