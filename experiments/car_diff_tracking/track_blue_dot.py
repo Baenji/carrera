@@ -11,6 +11,10 @@ Ablauf:
   5. Im Originalbild werden die blauen Pixel gesucht (HSV-Farbbereich). Blau UND Differenzmaske
      = blaue Pixel, die nicht schon im Referenzbild waren. Der größte solche Fleck ist der Punkt
      auf dem Auto, sein Schwerpunkt ist die Position.
+  6. Das Referenzbild wird laufend langsam an das aktuelle Bild angeglichen, überall außer in
+     einem Kreis um die letzte Position des blauen Punkts. So verschwinden Schatten,
+     Lichtänderungen und neue Gegenstände nach kurzer Zeit von selbst, das Auto brennt aber
+     nicht ein (auch nicht, wenn es steht).
 
 Tasten im Fenster:
   b    Referenzbild aufnehmen (Strecke muss leer sein!)
@@ -186,13 +190,30 @@ def read_frame(cap: cv2.VideoCapture) -> np.ndarray:
 
 
 class DiffTracker:
-    """Liefert die Differenzmaske: weiß = anders als das Referenzbild der leeren Strecke."""
+    """Liefert die Differenzmaske: weiß = anders als das Referenzbild der leeren Strecke.
 
-    def __init__(self, threshold: int, blur: int, scale: float):
+    Das Referenzbild wird über update_reference() laufend nachgeführt.
+    """
+
+    def __init__(
+        self,
+        threshold: int,
+        blur: int,
+        scale: float,
+        ref_alpha: float,
+        protect_radius: int,
+    ):
         self.threshold = threshold
         self.blur = blur | 1  # muss ungerade sein
         self.scale = scale  # Verarbeitung auf verkleinertem Bild -> deutlich schneller
-        self.reference: np.ndarray | None = None
+        self.ref_alpha = ref_alpha  # Anpassungsrate des Referenzbilds pro Frame (0 = aus)
+        self.protect_radius = protect_radius  # Schutzkreis ums Auto (px im Originalbild)
+        self.reference: np.ndarray | None = None  # uint8, zum Vergleichen
+        # float32-Kopie fürs Nachführen: kleine Änderungen (alpha * Differenz < 0.5)
+        # würden in uint8 weggerundet und das Referenzbild würde sich nie bewegen
+        self.reference_f: np.ndarray | None = None
+        self.last_center: tuple[int, int] | None = None  # letzte bekannte Auto-Position
+        self.cur: np.ndarray | None = None  # zuletzt vorverarbeiteter Frame (für update_reference)
         self.kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         self.kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
 
@@ -206,13 +227,16 @@ class DiffTracker:
 
     def set_reference(self, frames: list[np.ndarray]) -> None:
         """Referenzbild = Mittelwert über Frames der leeren Strecke."""
-        mean = np.mean([self.prep(f).astype(np.float32) for f in frames], axis=0)
-        self.reference = cv2.convertScaleAbs(mean)
+        self.reference_f = np.mean(
+            [self.prep(f).astype(np.float32) for f in frames], axis=0
+        ).astype(np.float32)
+        self.reference = cv2.convertScaleAbs(self.reference_f)
+        self.last_center = None
 
     def process(self, frame: np.ndarray) -> np.ndarray:
         """Gibt die Differenzmaske in Originalauflösung zurück."""
         assert self.reference is not None
-        cur = self.prep(frame)
+        cur = self.cur = self.prep(frame)
         # Differenz pro Farbkanal, dann Maximum über die Kanäle:
         # so fällt das Auto auch auf, wenn es nur in einem Kanal vom Referenzbild abweicht
         d = cv2.absdiff(cur, self.reference)
@@ -230,6 +254,32 @@ class DiffTracker:
                 mask, (frame.shape[1], frame.shape[0]), interpolation=cv2.INTER_NEAREST
             )
         return mask
+
+    def update_reference(self, car_pos: tuple[int, int] | None) -> None:
+        """Referenzbild an den zuletzt mit process() verarbeiteten Frame angleichen.
+
+        car_pos: aktuelle Position des blauen Punkts (Originalkoordinaten) oder None.
+        Wird nach find_blue_dot() aufgerufen, weil erst dann bekannt ist, wo das Auto ist.
+        Der Schutzkreis liegt um den blauen Punkt und nicht um die größte Differenzfläche,
+        damit immer unser Auto geschützt wird und nicht z.B. eine Hand oder das zweite Auto.
+        """
+        if car_pos is not None:
+            self.last_center = car_pos
+        if self.ref_alpha <= 0 or self.cur is None:
+            return
+        # Referenz langsam an das aktuelle Bild angleichen (gleitender Mittelwert):
+        #   ref = (1 - alpha) * ref + alpha * aktuelles Bild
+        # Überall, außer in einem Kreis um die letzte Auto-Position. Wird der Punkt gerade
+        # nicht erkannt (z.B. Bewegungsunschärfe), bleibt der Kreis an der letzten Position.
+        update = np.full(self.cur.shape[:2], 255, np.uint8)
+        if self.last_center is not None:
+            c = (
+                int(self.last_center[0] * self.scale),
+                int(self.last_center[1] * self.scale),
+            )
+            cv2.circle(update, c, int(self.protect_radius * self.scale), 0, -1)
+        cv2.accumulateWeighted(self.cur, self.reference_f, self.ref_alpha, mask=update)
+        self.reference = cv2.convertScaleAbs(self.reference_f)
 
 
 def find_blue_dot(
@@ -330,6 +380,20 @@ def main() -> None:
     ap.add_argument(
         "--ref-frames", type=int, default=30, help="Anzahl Frames für das Referenzbild"
     )
+    ap.add_argument(
+        "--ref-alpha",
+        type=float,
+        default=0.05,
+        help="Anpassungsrate des Referenzbilds pro Frame (0 = aus). "
+        "0.05 ≈ 0.2 s Halbwertszeit bei 60 fps, 0.005 ≈ 2 s",
+    )
+    ap.add_argument(
+        "--protect-radius",
+        type=int,
+        default=70,
+        help="Radius (px) um den blauen Punkt, in dem das Referenzbild NICHT angepasst wird. "
+        "Muss das ganze Auto abdecken",
+    )
     args = ap.parse_args()
 
     device = args.device if args.device is not None else find_brio()
@@ -337,7 +401,9 @@ def main() -> None:
     cap = open_camera(device, args.width, args.height, args.fps)
     lock_camera(cap, args.exposure)
 
-    tracker = DiffTracker(args.threshold, args.blur, args.scale)
+    tracker = DiffTracker(
+        args.threshold, args.blur, args.scale, args.ref_alpha, args.protect_radius
+    )
     view_mode = 0  # 0 = Kamerabild, 1 = Differenzmaske, 2 = Blau-Maske
     cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
 
@@ -370,6 +436,7 @@ def main() -> None:
                 center, radius, blue_mask = find_blue_dot(
                     frame, diff_mask, args.min_dot_area
                 )
+                tracker.update_reference(center)
                 if view_mode == 1:
                     view = cv2.cvtColor(diff_mask, cv2.COLOR_GRAY2BGR)
                 elif view_mode == 2:
