@@ -66,6 +66,25 @@ center, mask = tracker.process(frame)         # center = (x, y) oder None
 - Es wird immer die **größte** Veränderung genommen. Hände, Schatten oder ein zweites Auto, die größer
   sind als das eigene Auto, werden stattdessen erkannt.
 
+## Blue-Dot-Version auf macOS (`track_blue_dot.py`)
+
+OpenCV liefert auf dem Mac nur 30 fps und kann Belichtung, Weißabgleich und Fokus nicht sperren.
+`track_blue_dot.py` liest die Kamera auf dem Mac deshalb über PyAV ein (60 fps bei 720p) und sperrt die
+Kamera mit dem Kommandozeilen-Tool [uvc-util](https://github.com/jtfrey/uvc-util). Beides braucht kein sudo.
+Einmalig einrichten (mit aktivem Environment):
+
+```bash
+pip install av
+git clone --depth 1 https://github.com/jtfrey/uvc-util.git /tmp/uvc-util
+cd /tmp/uvc-util/src && gcc -o "$VIRTUAL_ENV/bin/uvc-util" -framework IOKit -framework Foundation \
+    uvc-util.m UVCController.m UVCType.m UVCValue.m      # bei conda: "$CONDA_PREFIX/bin/uvc-util"
+uvc-util -d                                              # sollte die Brio anzeigen
+```
+
+`--exposure` ist auf dem Mac wie unter Linux in 100 µs anzugeben (Standard `39` = 3,9 ms). Die Kamera
+behält die festen Werte, bis sie abgesteckt wird. Zurück auf Automatik geht es mit
+`uvc-util -I 0 -s auto-exposure-mode=8 -s auto-white-balance-temp=1 -s auto-focus=1`.
+
 ## Advanced-Version (`track_car_advanced.py`)
 
 Gleiche Bedienung, zusätzlich:

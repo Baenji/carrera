@@ -30,16 +30,19 @@ Plattformen:
   Windows: DirectShow-Backend. Brio wird per Name gefunden, wenn `pygrabber` installiert ist
            (pip install pygrabber), sonst Kamera-Index 0 -> ggf. --device 1 angeben.
            --exposure ist dort in log2(Sekunden) anzugeben (z.B. -7 ≈ 8 ms).
-  macOS:   AVFoundation-Backend, Brio wird per Name gefunden (über system_profiler).
-           Einschränkung: OpenCV kann dort nur Auflösung und FPS setzen. Belichtung, Weißabgleich
-           und Fokus bleiben auf Automatik, und die Brio liefert nur 30 fps.
+  macOS:   Frames über PyAV (pip install av) statt OpenCV, weil OpenCV auf dem Mac nie einen
+           Modus mit mehr als 30 fps wählt (Brio über PyAV: 720p mit 60 oder 90 fps).
+           Die Kamera wird über ihren Namen geöffnet ("Logitech BRIO",
+           andere Namen zeigt `ffmpeg -f avfoundation -list_devices true -i ""`).
+           Belichtung usw. über uvc-util, muss einmal gebaut werden (siehe README).
+           --exposure ist dort wie unter Linux in 100 µs anzugeben.
 """
 
 from __future__ import annotations
 
 import argparse
 import glob
-import json
+import shutil
 import subprocess
 import sys
 import time
@@ -62,8 +65,8 @@ if IS_WINDOWS:
     AE_AUTO, AE_MANUAL = 0.75, 0.25  # Konvention des DirectShow-Backends
     DEFAULT_EXPOSURE = -8  # log2(Sekunden): 2^-8 s ≈ 3,9 ms (wie 39 unter Linux)
 elif IS_MAC:
-    BACKEND = cv2.CAP_AVFOUNDATION  # kann nur Auflösung und FPS setzen, siehe lock_camera()
-    DEFAULT_EXPOSURE = None  # wird auf macOS ohnehin ignoriert
+    # Kein OpenCV-Backend: Frames kommen über PyAV, siehe MacCamera
+    DEFAULT_EXPOSURE = 39  # uvc-util nutzt dieselbe Einheit wie Linux (100 µs): 3,9 ms
 else:
     BACKEND = cv2.CAP_V4L2 if sys.platform.startswith("linux") else cv2.CAP_ANY
     AE_AUTO, AE_MANUAL = 3, 1  # V4L2: 3 = auto (aperture priority), 1 = manuell
@@ -91,34 +94,58 @@ def find_brio() -> str | int:
                 return i
         return 0
     if IS_MAC:
-        # OpenCV nummeriert die Kameras auf dem Mac nach ihrer Unique ID sortiert
-        try:
-            out = subprocess.run(
-                ["system_profiler", "SPCameraDataType", "-json"],
-                capture_output=True,
-                text=True,
-            ).stdout
-            cams = sorted(
-                json.loads(out)["SPCameraDataType"],
-                key=lambda c: c["spcamera_unique-id"],
-            )
-        except (OSError, ValueError, KeyError):
-            print(
-                "[kamera] Kameraliste nicht lesbar -> nehme Index 0 (sonst --device 1, 2, ...)"
-            )
-            return 0
-        for i, cam in enumerate(cams):
-            if "brio" in cam["_name"].lower():
-                return i
-        return 0
+        return "Logitech BRIO"  # PyAV öffnet die Kamera über ihren genauen Namen
     # Linux: index0 = eigentlicher Farbstream
     hits = sorted(glob.glob("/dev/v4l/by-id/*BRIO*-video-index0"))
     return hits[0] if hits else 0
 
 
+class MacCamera:
+    """Kamera auf macOS über PyAV (ffmpeg, avfoundation).
+
+    Hat dieselben Methoden read() und release() wie cv2.VideoCapture, damit der restliche
+    Code nicht wissen muss, woher die Frames kommen.
+    """
+
+    def __init__(self, device: str, width: int, height: int, fps: int):
+        import av  # nur auf macOS nötig
+
+        try:
+            self.container = av.open(
+                device,
+                format="avfoundation",
+                options={"framerate": str(fps), "video_size": f"{width}x{height}"},
+            )
+        except av.error.FFmpegError as e:
+            raise SystemExit(
+                f"Kamera {device!r} konnte nicht geöffnet werden ({e}). Name prüfen mit: "
+                'ffmpeg -f avfoundation -list_devices true -i ""\n'
+                "Unterstützte Auflösungen/fps: ffmpeg -f avfoundation -video_size 1x1 "
+                f'-i "{device}"'
+            )
+        self.stream = self.container.streams.video[0]
+        print(f"[kamera] Modus: {self.stream.width}x{self.stream.height} @ {fps} fps (PyAV)")
+
+    def read(self) -> tuple[bool, np.ndarray]:
+        while True:
+            try:
+                packet = next(self.container.demux(self.stream))
+            except BlockingIOError:
+                # avfoundation meldet so "noch kein neuer Frame da" -> kurz warten, nochmal
+                time.sleep(0.001)
+                continue
+            for frame in packet.decode():
+                return True, frame.to_ndarray(format="bgr24")
+
+    def release(self) -> None:
+        self.container.close()
+
+
 def open_camera(
     device: str | int, width: int, height: int, fps: int
-) -> cv2.VideoCapture:
+) -> cv2.VideoCapture | MacCamera:
+    if IS_MAC:
+        return MacCamera(str(device), width, height, fps)
     if isinstance(device, str) and device.isdigit():
         device = int(device)
     cap = cv2.VideoCapture(device, BACKEND)
@@ -135,8 +162,50 @@ def open_camera(
     return cap
 
 
+def uvc(*args: str) -> str:
+    """Ruft uvc-util für die erste UVC-Kamera auf (Index 0) und gibt die Ausgabe zurück."""
+    out = subprocess.run(["uvc-util", "-I", "0", *args], capture_output=True, text=True)
+    return out.stdout
+
+
+def uvc_get(control: str) -> str:
+    """Liest einen Wert, z.B. uvc_get("focus-abs") -> "10". uvc-util gibt "name = wert" aus."""
+    return uvc("-g", control).split("=")[-1].strip()
+
+
+def lock_camera_mac(cap: MacCamera, exposure: float | None, settle_s: float) -> None:
+    """Wie lock_camera(), aber über uvc-util, weil OpenCV auf dem Mac nichts davon setzen kann."""
+    if shutil.which("uvc-util") is None:
+        print(
+            "[kamera] WARNUNG: uvc-util nicht gefunden (siehe README). "
+            "Belichtung/Weißabgleich/Fokus bleiben auf Automatik."
+        )
+        return
+    # Automatik an (Belichtungsmodus 8 = Automatik der Brio) und einschwingen lassen
+    uvc("-s", "auto-exposure-mode=8", "-s", "auto-white-balance-temp=1", "-s", "auto-focus=1")
+    t0 = time.perf_counter()
+    while time.perf_counter() - t0 < settle_s:
+        cap.read()
+
+    exp = int(exposure) if exposure is not None else int(uvc_get("exposure-time-abs"))
+    wb = uvc_get("white-balance-temp")
+    focus = uvc_get("focus-abs")
+    # Modus 1 = manuell. Reihenfolge wichtig: erst Automatik aus, dann Wert setzen
+    uvc(
+        "-s", "auto-exposure-mode=1", "-s", f"exposure-time-abs={exp}",
+        "-s", "auto-white-balance-temp=0", "-s", f"white-balance-temp={wb}",
+        "-s", "auto-focus=0", "-s", f"focus-abs={focus}",
+    )  # fmt: skip
+    print(
+        f"[kamera] gesperrt: exposure={uvc_get('exposure-time-abs')} (x100µs)  "
+        f"wb={uvc_get('white-balance-temp')}K  focus={uvc_get('focus-abs')}"
+    )
+    if uvc_get("auto-exposure-mode") != "1":
+        print("[kamera] WARNUNG: Belichtung konnte nicht gesperrt werden")
+
+
 def lock_camera(
-    cap: cv2.VideoCapture, exposure: float | None, settle_s: float = 2.0
+    cap: cv2.VideoCapture | MacCamera, exposure: float | None, settle_s: float = 2.0
 ) -> None:
     """Automatik einschwingen lassen und dann einfrieren.
 
@@ -145,12 +214,7 @@ def lock_camera(
     Vergleich mit dem Referenzbild liefert überall Unterschiede.
     """
     if IS_MAC:
-        print(
-            "[kamera] WARNUNG: macOS kann Belichtung/Weißabgleich/Fokus über OpenCV nicht sperren, "
-            "die Automatik bleibt an. Werte ggf. in Logi Tune fest einstellen."
-        )
-        if exposure is not None:
-            print("[kamera] --exposure wird auf macOS ignoriert")
+        lock_camera_mac(cap, exposure, settle_s)
         return
     cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, AE_AUTO)
     cap.set(cv2.CAP_PROP_AUTO_WB, 1)
@@ -361,9 +425,9 @@ def main() -> None:
         type=float,
         default=DEFAULT_EXPOSURE,
         help="Feste Belichtung. Linux: 100µs-Einheiten (z.B. 100 = 10ms, flickerfrei bei 50Hz-Licht). "
-        "Windows: log2(Sekunden), z.B. -7 ≈ 8ms. macOS: wird ignoriert. "
+        "Windows: log2(Sekunden), z.B. -7 ≈ 8ms. macOS: wie Linux. "
         "Kurz halten, sonst verschmiert der blaue Punkt. "
-        "Default: 3,9 ms (Linux 39, Windows -8), dazu passen BLUE_LOW/BLUE_HIGH",
+        "Default: 3,9 ms (Linux/macOS 39, Windows -8), dazu passen BLUE_LOW/BLUE_HIGH",
     )
     ap.add_argument(
         "--threshold",
