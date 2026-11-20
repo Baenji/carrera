@@ -143,13 +143,13 @@ und Helligkeit:
 
 | Kanal | Bedeutung | Bereich für unseren Punkt |
 |---|---|---|
-| H (Hue, Farbton) | welche Farbe, als Winkel auf dem Farbkreis | 104 bis 118 |
-| S (Saturation, Sättigung) | wie kräftig die Farbe ist, 0 = grau | ab 110 |
+| H (Hue, Farbton) | welche Farbe, als Winkel auf dem Farbkreis | 104 bis 125 |
+| S (Saturation, Sättigung) | wie kräftig die Farbe ist, 0 = grau | ab 90 |
 | V (Value, Helligkeit) | wie hell | ab 40 |
 
-OpenCV halbiert den Farbton, damit er in ein Byte passt (0 bis 179 statt 0 bis 359°). 104 bis 118
-entspricht also etwa 208 bis 236°, das ist reines Blau. Fällt ein Schatten auf den Punkt, ändert sich
-vor allem V, der Farbton bleibt gleich.
+OpenCV halbiert den Farbton, damit er in ein Byte passt (0 bis 179 statt 0 bis 359°). 104 bis 125
+entspricht also etwa 208 bis 250°, das ist Blau (Violett beginnt erst um 260°). Fällt ein Schatten
+auf den Punkt, ändert sich vor allem V, der Farbton nur wenig.
 
 Die Blau-Maske wird in voller Auflösung berechnet, weil der Punkt nur wenige Pixel groß ist. Auf halber
 Auflösung bliebe kaum etwas von ihm übrig.
@@ -232,7 +232,7 @@ Abweichung (5 % von 8 sind 0,4) jedes Mal auf 0 abgerundet, und das Referenzbild
 | Parameter | Standard | Wirkung |
 |---|---|---|
 | Schwellwert (`+`/`-`) | 20 | ab welcher Abweichung ein Pixel als „neu“ gilt |
-| Blau-Bereich (HSV) | H 104 bis 118, S ≥ 110, V ≥ 40 | was als „blau“ gilt. Werte per Klick auslesen, Grenzen im Code anpassen |
+| Blau-Bereich (HSV) | H 104 bis 125, S ≥ 90, V ≥ 40 | was als „blau“ gilt. Werte per Klick auslesen, Grenzen im Code anpassen |
 | Mindestgröße Punkt | 15 px | kleinere blaue Flecken gelten als Rauschen |
 | Belichtung | 3,9 ms | kürzer heißt weniger Unschärfe, aber ein dunkleres Bild |
 | Anpassungsrate α | 0,05 | wie schnell das Referenzbild nachzieht. Bei 0 aus, dann muss die Strecke beim Start leer sein |
