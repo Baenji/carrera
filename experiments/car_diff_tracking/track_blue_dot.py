@@ -50,6 +50,7 @@ import numpy as np
 WINDOW = "Blue Dot Tracking"
 
 # Farbbereich des blauen Punkts in HSV (OpenCV: H 0-179, S und V 0-255).
+# Kalibriert für den dunkleren Punkt bei fester Belichtung von 3,9 ms (siehe DEFAULT_EXPOSURE).
 BLUE_LOW = (104, 110, 40)
 BLUE_HIGH = (118, 255, 255)
 
@@ -59,11 +60,14 @@ if IS_WINDOWS:
     # DirectShow statt MSMF: öffnet schneller und reicht Belichtung/Weißabgleich/Fokus an die Kamera durch
     BACKEND = cv2.CAP_DSHOW
     AE_AUTO, AE_MANUAL = 0.75, 0.25  # Konvention des DirectShow-Backends
+    DEFAULT_EXPOSURE = -8  # log2(Sekunden): 2^-8 s ≈ 3,9 ms (wie 39 unter Linux)
 elif IS_MAC:
     BACKEND = cv2.CAP_AVFOUNDATION  # kann nur Auflösung und FPS setzen, siehe lock_camera()
+    DEFAULT_EXPOSURE = None  # wird auf macOS ohnehin ignoriert
 else:
     BACKEND = cv2.CAP_V4L2 if sys.platform.startswith("linux") else cv2.CAP_ANY
     AE_AUTO, AE_MANUAL = 3, 1  # V4L2: 3 = auto (aperture priority), 1 = manuell
+    DEFAULT_EXPOSURE = 39  # Einheiten von 100 µs: 3,9 ms, im Test besser als die Automatik
 
 
 # --------------------------------
@@ -355,10 +359,11 @@ def main() -> None:
     ap.add_argument(
         "--exposure",
         type=float,
-        default=None,
+        default=DEFAULT_EXPOSURE,
         help="Feste Belichtung. Linux: 100µs-Einheiten (z.B. 100 = 10ms, flickerfrei bei 50Hz-Licht). "
         "Windows: log2(Sekunden), z.B. -7 ≈ 8ms. macOS: wird ignoriert. "
-        "Kurz halten, sonst verschmiert der blaue Punkt. Default: Wert der Automatik übernehmen",
+        "Kurz halten, sonst verschmiert der blaue Punkt. "
+        "Default: 3,9 ms (Linux 39, Windows -8), dazu passen BLUE_LOW/BLUE_HIGH",
     )
     ap.add_argument(
         "--threshold",
