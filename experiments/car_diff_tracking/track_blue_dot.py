@@ -432,7 +432,7 @@ def main() -> None:
     ap.add_argument(
         "--threshold",
         type=int,
-        default=30,
+        default=20,
         help="Mindestdifferenz (0-255) für 'anders als Referenz'",
     )
     ap.add_argument(
