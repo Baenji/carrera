@@ -11,8 +11,8 @@ class CarreraEnv(gym.Env):
         # Wir haben Lange Gerade (G), kurze Gerade (g), Rechtskurve (R), Linkskurve (L)
         self.TEILE = {
          "G": (342.0, 0.0), "g": (114.0, 0.0),
-         "R": (math.pi / 2 * 142.5, 142.5),
-         "L": (math.pi / 2 * 199.5, 199.5)
+         "R": (math.pi / 2 * 226,2, 226,2),
+         "L": (math.pi / 2 * 315,7, 315,7)
          }
 
         # Wie schaut unsere Strecke aus basiernd auf den definierten Segmenten in self.TEILE
@@ -73,7 +73,7 @@ class CarreraEnv(gym.Env):
         self._pos = self.np_random.uniform(0, self.track_len)
 
         # Eine zufällige Geschwindigkeit zwischen 0 und der Maximalgeschwindigkeit zum Start wählen
-        self._speed = self.np_random.uniform(0.0, self.v_max)
+        self._speed = self.np_random.uniform(0.0, self.v_crash)
         self._update_distances()
         self.step_count = 0
         return self._get_obs(), {}
