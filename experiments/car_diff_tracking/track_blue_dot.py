@@ -5,7 +5,10 @@ an der ein blauer Punkt liegt. Hände, Schatten und blaue Dinge neben der Streck
 
 Ablauf:
   1. Kamera öffnen, Automatik (Belichtung/Weißabgleich/Fokus) einschwingen lassen und dann sperren.
-  2. Strecke OHNE Auto -> [b] -> Referenzbild = Mittel aus 30 Frames.
+  2. Referenzbild = Mittel aus den ersten 30 Frames, automatisch direkt nach dem Start. Die
+     Strecke muss dafür nicht leer sein: Was dabei im Bild war (Hand, stehendes Auto), wird durch
+     Schritt 6 nach kurzer Zeit aus dem Referenzbild "herausgerechnet". Ein Auto, das schon beim
+     Start auf der Strecke steht, wird allerdings erst erkannt, sobald es losfährt.
   3. Auto aufsetzen und fahren lassen.
   4. Jeder Frame wird mit dem Referenzbild verglichen -> Differenzmaske (alles, was neu ist).
   5. Im Originalbild werden die blauen Pixel gesucht (HSV-Farbbereich). Blau UND Differenzmaske
@@ -17,7 +20,6 @@ Ablauf:
      nicht ein (auch nicht, wenn es steht).
 
 Tasten im Fenster:
-  b    Referenzbild aufnehmen (Strecke muss leer sein!)
   m    Ansicht wechseln: Kamerabild -> Differenzmaske -> Blau-Maske
   +/-  Schwellwert der Differenzmaske
   Klick ins Bild: HSV-Wert an dieser Stelle ausgeben (zum Kalibrieren von BLUE_LOW/BLUE_HIGH)
@@ -301,7 +303,7 @@ class DiffTracker:
         return cv2.GaussianBlur(frame, (self.blur, self.blur), 0)
 
     def set_reference(self, frames: list[np.ndarray]) -> None:
-        """Referenzbild = Mittelwert über Frames der leeren Strecke."""
+        """Referenzbild = Mittelwert über mehrere Frames (Rauschen mittelt sich heraus)."""
         self.reference_f = np.mean(
             [self.prep(f).astype(np.float32) for f in frames], axis=0
         ).astype(np.float32)
@@ -461,7 +463,8 @@ def main() -> None:
         type=float,
         default=0.05,
         help="Anpassungsrate des Referenzbilds pro Frame (0 = aus). "
-        "0.05 ≈ 0.2 s Halbwertszeit bei 60 fps, 0.005 ≈ 2 s",
+        "0.05 ≈ 0.2 s Halbwertszeit bei 60 fps, 0.005 ≈ 2 s. "
+        "Bei 0 muss die Strecke beim Start leer sein",
     )
     ap.add_argument(
         "--protect-radius",
@@ -480,6 +483,8 @@ def main() -> None:
     tracker = DiffTracker(
         args.threshold, args.blur, args.scale, args.ref_alpha, args.protect_radius
     )
+    tracker.set_reference([read_frame(cap) for _ in range(args.ref_frames)])
+    print(f"[ref] Referenzbild aus den ersten {args.ref_frames} Frames gemittelt")
     view_mode = 0  # 0 = Kamerabild, 1 = Differenzmaske, 2 = Blau-Maske
     cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
 
@@ -512,39 +517,27 @@ def main() -> None:
             # Auf eine Kopie zeichnen, damit der Klick die echten Farben misst
             view = frame.copy()
 
-            if tracker.reference is None:
-                lines = [
-                    "Strecke leeren (kein Auto!), dann [b] fuer Referenzbild",
-                    "[q] beenden",
-                ]
-            else:
-                diff_mask = tracker.process(frame)
-                center, radius, blue_mask = find_blue_dot(
-                    frame, diff_mask, args.min_dot_area
-                )
-                tracker.update_reference(center)
-                if view_mode == 1:
-                    view = cv2.cvtColor(diff_mask, cv2.COLOR_GRAY2BGR)
-                elif view_mode == 2:
-                    view = cv2.cvtColor(blue_mask, cv2.COLOR_GRAY2BGR)
-                if center is not None:
-                    # Dünner Ring knapp außerhalb des blauen Flecks, Mittelpunkt als einzelnes Pixel
-                    cv2.circle(view, center, radius + 2, (0, 0, 255), 1, cv2.LINE_AA)
-                    view[center[1], center[0]] = (0, 0, 255)
-                lines = [
-                    f"pos={center}" if center else "kein blauer Punkt erkannt",
-                    f"thr={tracker.threshold} | [b] Referenz [m] Ansicht [+/-] Schwelle "
-                    "[Klick] HSV [q] Ende",
-                ]
+            diff_mask = tracker.process(frame)
+            center, radius, blue_mask = find_blue_dot(frame, diff_mask, args.min_dot_area)
+            tracker.update_reference(center)
+            if view_mode == 1:
+                view = cv2.cvtColor(diff_mask, cv2.COLOR_GRAY2BGR)
+            elif view_mode == 2:
+                view = cv2.cvtColor(blue_mask, cv2.COLOR_GRAY2BGR)
+            if center is not None:
+                # Dünner Ring knapp außerhalb des blauen Flecks, Mittelpunkt als einzelnes Pixel
+                cv2.circle(view, center, radius + 2, (0, 0, 255), 1, cv2.LINE_AA)
+                view[center[1], center[0]] = (0, 0, 255)
+            lines = [
+                f"pos={center}" if center else "kein blauer Punkt erkannt",
+                f"thr={tracker.threshold} | [m] Ansicht [+/-] Schwelle [Klick] HSV [q] Ende",
+            ]
 
             put_text(view, lines)
             cv2.imshow(WINDOW, view)
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
                 break
-            elif key == ord("b"):
-                tracker.set_reference([read_frame(cap) for _ in range(args.ref_frames)])
-                print(f"[ref] Referenzbild aus {args.ref_frames} Frames gemittelt")
             elif key == ord("m"):
                 view_mode = (view_mode + 1) % 3
             elif key in (ord("+"), ord("=")):
