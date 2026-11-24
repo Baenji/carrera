@@ -67,6 +67,16 @@ Konzept-Dokus (Beispiel: `experiments/car_diff_tracking/DOKU.md`) sind Markdown-
 - Schlichter Text: keine Emojis, kein Fettdruck, keine Gedankenstriche (vorher den humanizer-Skill drüberlaufen lassen).
 - Diagrammfarben kontrastreich wählen, sie müssen im hellen und im dunklen Modus lesbar sein.
 
+## Code-Stil (Namen)
+
+Das Team soll den Code ohne Rätselraten lesen können, deshalb sprechende Namen statt Mathe-Kürzel.
+
+- Namen ausschreiben: `segment_lengths` statt `seg_len`, `parser` statt `ap`, `camera` statt `cap`, `import track_blue_dot` statt `as tbd`.
+- Keine Einbuchstaben-Variablen, der Name sagt, was drinsteht: `distance_travelled` statt `s`, `closest_segment` statt `i`, `fraction_along_segment` statt `t`.
+- Funktionen beginnen mit einem Verb: `calculate_progress` statt `progress`, `calculate_speed` statt `speed`.
+- Einheiten gehören in den Namen, wo sie nicht offensichtlich sind: `lane_length_mm`, `SPEED_WINDOW_SECONDS`.
+- Kürzen nur, wenn ein Name sonst wirklich unhandlich lang wird.
+
 ## Setup
 
 Es gibt keine Tests, keinen Linter und noch keine gemeinsame `requirements.txt` für den Neubau.

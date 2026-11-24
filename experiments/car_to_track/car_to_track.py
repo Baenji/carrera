@@ -39,125 +39,153 @@ import numpy as np
 
 # track_blue_dot.py liegt in einem anderen Experiment-Ordner
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "car_diff_tracking"))
-import track_blue_dot as tbd  # noqa: E402
+import track_blue_dot  # noqa: E402
 
-WINDOW = "Car to Track"
-OUT_FILE = Path(__file__).resolve().parent / "track_polygon.npy"
+WINDOW_NAME = "Car to Track"
+POLYGON_FILE = Path(__file__).resolve().parent / "track_polygon.npy"
 
-MIN_STEP = 5  # px: neuer Punkt erst ab diesem Abstand zum letzten (sonst Punkthaufen beim Stehen)
-CLOSE_DIST = 30  # px: so nah am Startpunkt gilt die Runde als geschlossen
+MIN_POINT_DISTANCE = 5  # px: neuer Punkt erst ab diesem Abstand zum letzten (sonst Punkthaufen beim Stehen)
+CLOSE_DISTANCE = 30  # px: so nah am Startpunkt gilt die Runde als geschlossen
 MIN_POINTS = 100  # Mindestanzahl Punkte (≈ 500 px Weg), damit die Runde nicht sofort schließt
 
 CAMERA_HEIGHT = 108.0  # cm: Kamera über der Bahn
 DOT_HEIGHT = 2.0  # cm: blauer Punkt über der Bahn
 
 
-def correct_parallax(p: tuple[int, int], shape: tuple[int, ...]) -> tuple[int, int]:
+def correct_parallax(
+    position: tuple[int, int], frame_shape: tuple[int, ...]
+) -> tuple[int, int]:
     """Rechnet die Position des Punkts auf die Stelle der Bahn direkt darunter zurück.
 
     Der Punkt erscheint um den Faktor H / (H - h) weiter von der Bildmitte entfernt als die
-    Bahn unter ihm, also wird er um (H - h) / H zur Bildmitte hin gezogen.
+    Bahn unter ihm (H = CAMERA_HEIGHT, h = DOT_HEIGHT), also wird er um (H - h) / H zur
+    Bildmitte hin gezogen.
     Annahme: Die Kamera schaut senkrecht nach unten (Bildmitte = Stelle unter der Kamera).
     """
-    k = (CAMERA_HEIGHT - DOT_HEIGHT) / CAMERA_HEIGHT
-    cx, cy = shape[1] / 2, shape[0] / 2
-    return round(cx + (p[0] - cx) * k), round(cy + (p[1] - cy) * k)
+    scale = (CAMERA_HEIGHT - DOT_HEIGHT) / CAMERA_HEIGHT
+    center_x, center_y = frame_shape[1] / 2, frame_shape[0] / 2
+    return (
+        round(center_x + (position[0] - center_x) * scale),
+        round(center_y + (position[1] - center_y) * scale),
+    )
 
 
-def progress(pos: tuple[int, int], polygon: np.ndarray) -> tuple[float, tuple[int, int]]:
+def calculate_progress(
+    position: tuple[int, int], polygon: np.ndarray
+) -> tuple[float, tuple[int, int]]:
     """Gibt (Fortschritt 0..1 entlang des geschlossenen Polygons, Fußpunkt auf dem Polygon) zurück.
 
     Abschnitt i geht von Punkt i zu Punkt i+1, der letzte zurück zum ersten. Die Position
     wird auf jeden Abschnitt projiziert (Lot fällen), der nächstgelegene Fußpunkt gewinnt.
     """
-    p = np.asarray(pos, dtype=np.float64)
-    a = polygon.astype(np.float64)  # Anfang jedes Abschnitts
-    seg = np.roll(a, -1, axis=0) - a  # Vektor vom Anfang zum Ende jedes Abschnitts
-    seg_len = np.linalg.norm(seg, axis=1)
-    # Lage des Fußpunkts als Anteil t des Abschnitts, auf 0..1 begrenzt (sonst läge er daneben)
-    t = np.clip(((p - a) * seg).sum(axis=1) / np.maximum(seg_len**2, 1e-9), 0, 1)
-    foot = a + t[:, None] * seg
-    i = int(np.argmin(np.linalg.norm(foot - p, axis=1)))  # nächstgelegener Abschnitt
-    # Weg vom Startpunkt = alle Abschnitte davor + Anteil des aktuellen
-    s = seg_len[:i].sum() + t[i] * seg_len[i]
-    return s / seg_len.sum(), (round(foot[i, 0]), round(foot[i, 1]))
+    position = np.asarray(position, dtype=np.float64)
+    segment_starts = polygon.astype(np.float64)
+    segment_ends = np.roll(segment_starts, -1, axis=0)  # der letzte Abschnitt endet am ersten Punkt
+    segment_vectors = segment_ends - segment_starts
+    segment_lengths = np.linalg.norm(segment_vectors, axis=1)
+
+    # Lage des Fußpunkts als Anteil des Abschnitts (0 = Anfang, 1 = Ende), auf 0..1 begrenzt,
+    # sonst läge er neben dem Abschnitt
+    fraction_along_segment = np.clip(
+        ((position - segment_starts) * segment_vectors).sum(axis=1)
+        / np.maximum(segment_lengths**2, 1e-9),
+        0,
+        1,
+    )
+    foot_points = segment_starts + fraction_along_segment[:, None] * segment_vectors
+    closest_segment = int(np.argmin(np.linalg.norm(foot_points - position, axis=1)))
+
+    # Weg vom Startpunkt = alle Abschnitte davor + Anteil des nächstgelegenen
+    distance_travelled = (
+        segment_lengths[:closest_segment].sum()
+        + fraction_along_segment[closest_segment] * segment_lengths[closest_segment]
+    )
+    lap_length = segment_lengths.sum()
+    foot_point = foot_points[closest_segment]
+    return distance_travelled / lap_length, (round(foot_point[0]), round(foot_point[1]))
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(
+    parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument(
+    parser.add_argument(
         "--device", default=None, help="Kamera (Pfad oder Index). Default: Brio suchen"
     )
-    args = ap.parse_args()
+    args = parser.parse_args()
 
-    device = args.device if args.device is not None else tbd.find_brio()
-    cap = tbd.open_camera(device, 1280, 720, 60)
-    tbd.lock_camera(cap, tbd.DEFAULT_EXPOSURE)
+    device = args.device if args.device is not None else track_blue_dot.find_brio()
+    camera = track_blue_dot.open_camera(device, 1280, 720, 60)
+    track_blue_dot.lock_camera(camera, track_blue_dot.DEFAULT_EXPOSURE)
     # Dieselben Werte wie die Defaults von track_blue_dot.py
-    tracker = tbd.DiffTracker(
+    tracker = track_blue_dot.DiffTracker(
         threshold=20, blur=5, scale=0.5, ref_alpha=0.05, protect_radius=70
     )
-    tracker.set_reference([tbd.read_frame(cap) for _ in range(30)])
-    cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
+    tracker.set_reference([track_blue_dot.read_frame(camera) for _ in range(30)])
+    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
 
-    points: list[tuple[int, int]] = []  # Positionen in Fahrtrichtung
+    polygon: list[tuple[int, int]] = []  # Positionen in Fahrtrichtung
     recording = False
-    closed = False
-    if OUT_FILE.exists():
-        points = [tuple(p) for p in np.load(OUT_FILE).tolist()]
-        closed = True
-        print(f"[polygon] {len(points)} Punkte aus {OUT_FILE} geladen")
+    polygon_closed = False
+    if POLYGON_FILE.exists():
+        polygon = [tuple(point) for point in np.load(POLYGON_FILE).tolist()]
+        polygon_closed = True
+        print(f"[polygon] {len(polygon)} Punkte aus {POLYGON_FILE} geladen")
 
     try:
         while True:
-            frame = tbd.read_frame(cap)
+            frame = track_blue_dot.read_frame(camera)
             diff_mask = tracker.process(frame)
-            center, radius, _ = tbd.find_blue_dot(frame, diff_mask)
-            tracker.update_reference(center)
-            pos = correct_parallax(center, frame.shape) if center is not None else None
+            dot_center, dot_radius, _ = track_blue_dot.find_blue_dot(frame, diff_mask)
+            tracker.update_reference(dot_center)
+            # Stelle der Bahn unter dem Punkt
+            position = (
+                correct_parallax(dot_center, frame.shape) if dot_center is not None else None
+            )
 
-            if recording and pos is not None:
-                if not points or math.dist(pos, points[-1]) >= MIN_STEP:
-                    points.append(pos)
-                if len(points) >= MIN_POINTS and math.dist(pos, points[0]) < CLOSE_DIST:
-                    recording, closed = False, True
-                    np.save(OUT_FILE, np.array(points, dtype=np.int32))
-                    print(f"[polygon] {len(points)} Punkte gespeichert in {OUT_FILE}")
+            if recording and position is not None:
+                if not polygon or math.dist(position, polygon[-1]) >= MIN_POINT_DISTANCE:
+                    polygon.append(position)
+                if (
+                    len(polygon) >= MIN_POINTS
+                    and math.dist(position, polygon[0]) < CLOSE_DISTANCE
+                ):
+                    recording, polygon_closed = False, True
+                    np.save(POLYGON_FILE, np.array(polygon, dtype=np.int32))
+                    print(f"[polygon] {len(polygon)} Punkte gespeichert in {POLYGON_FILE}")
 
             # Zeichnen: Spur orange während der Aufnahme, geschlossenes Polygon grün
             view = frame
-            if len(points) >= 2:
-                color = (0, 255, 0) if closed else (0, 165, 255)
-                cv2.polylines(view, [np.array(points, np.int32)], closed, color, 2)
-            if points:
-                cv2.circle(view, points[0], 6, (0, 255, 255), -1)  # Startpunkt
-            if center is not None:
-                cv2.circle(view, center, radius + 2, (0, 0, 255), 1, cv2.LINE_AA)
+            if len(polygon) >= 2:
+                color = (0, 255, 0) if polygon_closed else (0, 165, 255)
+                cv2.polylines(view, [np.array(polygon, np.int32)], polygon_closed, color, 2)
+            if polygon:
+                cv2.circle(view, polygon[0], 6, (0, 255, 255), -1)  # Startpunkt
+            if dot_center is not None:
+                cv2.circle(view, dot_center, dot_radius + 2, (0, 0, 255), 1, cv2.LINE_AA)
 
-            if closed and pos is not None:
-                frac, foot = progress(pos, np.array(points))
-                cv2.circle(view, foot, 6, (255, 0, 255), -1)  # Position auf dem Polygon
-                status = f"Fortschritt: {frac * 100:.1f} %"
-            elif closed:
+            if polygon_closed and position is not None:
+                progress, foot_point = calculate_progress(position, np.array(polygon))
+                cv2.circle(view, foot_point, 6, (255, 0, 255), -1)  # Position auf dem Polygon
+                status = f"Fortschritt: {progress * 100:.1f} %"
+            elif polygon_closed:
                 status = "Fortschritt: Auto nicht erkannt"
             elif recording:
-                status = f"Aufnahme: {len(points)} Punkte"
+                status = f"Aufnahme: {len(polygon)} Punkte"
             else:
                 status = "bereit"
-            tbd.put_text(view, [status, "[r] Aufnahme (neu) starten  [q] Ende"])
-            cv2.imshow(WINDOW, view)
+            track_blue_dot.put_text(view, [status, "[r] Aufnahme (neu) starten  [q] Ende"])
+            cv2.imshow(WINDOW_NAME, view)
 
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
                 break
             elif key == ord("r"):
-                points, recording, closed = [], True, False
-            if cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
+                polygon, recording, polygon_closed = [], True, False
+            if cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_VISIBLE) < 1:
                 break
     finally:
-        cap.release()
+        camera.release()
         cv2.destroyAllWindows()
 
 
