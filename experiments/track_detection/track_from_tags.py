@@ -1,9 +1,9 @@
 """Strecke aus den AprilTags (tag36h11) erkennen und als tag_list ausgeben.
 
-Ergebnis:
-  tag_list  Tag-IDs in Fahrtrichtung, beginnend beim Start-Tag (ID 0), z. B. [0, 3, 4, 4, 1, ...]
-  turns     pro Eintrag "L" oder "R" bei Kurven, None bei Geraden. Ohne turns wüsste man aus der
-            tag_list nicht, in welche Richtung eine Kurve geht, denn beide haben ID 4.
+Ergebnis (im Terminal und in strecke.json):
+  tag_list  Streckenteile in Fahrtrichtung, beginnend beim Start, z. B. [1, 3, "R", "R", "L", 3, ...]
+            1 / 2 / 3 = kurze / mittlere / lange Gerade, "L" / "R" = Links- / Rechtskurve.
+            Der Start steht als 1 an erster Stelle, weil er so lang ist wie eine kurze Gerade.
 
 Wie die Reihenfolge entsteht:
   Aus Position und Drehung jedes Tags und den Teilemaßen wird berechnet, wo die beiden Enden
@@ -24,8 +24,10 @@ from __future__ import annotations
 
 import argparse
 import glob
+import json
 import sys
 import time
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -40,7 +42,9 @@ PARTS = {
     4: ("Kurve", None),  # 90°
 }
 START_ID, CURVE_ID = 0, 4
-CURVE_RADIUS_MM = 173.0  # Tag-Mitte -> Kurvenmittelpunkt: innere Spur 144 mm + halber Spurabstand 29 mm. Nachmessen!
+# Kurvenradien gemessen: innere Spur 144 mm (Bogen 226,2 mm), äußere Spur 201 mm (Bogen 315,7 mm).
+# Das Tag klebt mittig zwischen den Spuren, sitzt also 172,5 mm vom Kurvenmittelpunkt entfernt.
+CURVE_RADIUS_MM = (144.0 + 201.0) / 2
 TAG_BLACK_MM = 26.4  # Kante des schwarzen Quadrats (33-mm-Tag = 10 Zellen à 3,3 mm, davon 8 schwarz umrandet)
 # So weit dürfen die berechneten Enden zweier zusammengesteckter Teile auseinanderliegen (schief geklebte
 # Tags, Perspektive). Kleiner als die kürzeste Gerade (114 mm), damit ein fehlendes Teil immer auffällt.
@@ -126,8 +130,8 @@ def piece_ends(tag: dict) -> list[np.ndarray]:
     return [tag["center"] - half, tag["center"] + half]
 
 
-def build_tag_list(tags: list[dict]) -> tuple[list[int], list[str | None], list[dict]]:
-    """Tags in Fahrtrichtung ordnen. Gibt (tag_list, turns, geordnete Tags) zurück."""
+def build_tag_list(tags: list[dict]) -> tuple[list[int | str], list[dict]]:
+    """Tags in Fahrtrichtung ordnen. Gibt (tag_list, geordnete Tags) zurück, tag_list wie oben beschrieben."""
     starts = [t for t in tags if t["id"] == START_ID]
     if len(starts) != 1:
         raise TrackError(f"{len(starts)} Start-Tags (ID {START_ID}) gefunden, erwartet genau 1.")
@@ -167,7 +171,15 @@ def build_tag_list(tags: list[dict]) -> tuple[list[int], list[str | None], list[
         print(f"[WARNUNG] {len(rest)} Tag(s) gehören nicht zur Runde, IDs {[t['id'] for t in rest]}")
     if abs(turns.count("R") - turns.count("L")) != 4:
         print(f"[WARNUNG] Rechts - Links = {turns.count('R') - turns.count('L')}, erwartet ±4. Kurven-Tag verdreht?")
-    return [t["id"] for t in ordered], turns, ordered
+    tag_list = []
+    for t, turn in zip(ordered, turns):
+        if turn:  # Kurve -> "L" oder "R"
+            tag_list.append(turn)
+        elif t["id"] == START_ID:  # Start ist so lang wie die kurze Gerade (ID 1)
+            tag_list.append(1)
+        else:
+            tag_list.append(t["id"])
+    return tag_list, ordered
 
 
 # --------------------------------
@@ -262,7 +274,7 @@ def capture_frames(device: str, width: int, height: int, n: int) -> list[np.ndar
     return frames
 
 
-def draw(img: np.ndarray, tags: list[dict], ordered: list[dict], turns: list) -> np.ndarray:
+def draw(img: np.ndarray, tags: list[dict], ordered: list[dict], tag_list: list) -> np.ndarray:
     out = img.copy()
     fs = max(img.shape[1] / 2000, 0.5)  # Schriftgröße passend zur Bildbreite
     for t in tags:  # alle erkannten Tags: Pfeil = Oberkante
@@ -272,8 +284,8 @@ def draw(img: np.ndarray, tags: list[dict], ordered: list[dict], turns: list) ->
     pts = np.array([t["center"] for t in ordered], np.int32)
     if len(pts) > 1:
         cv2.polylines(out, [pts], True, (0, 255, 0), max(int(3 * fs), 1))
-    for i, (t, turn) in enumerate(zip(ordered, turns)):
-        label = f"{i}: ID{t['id']}" + (f" {turn}" if turn else "")
+    for i, (t, entry) in enumerate(zip(ordered, tag_list)):
+        label = "0: Start" if i == 0 else f"{i}: {entry}"
         org = tuple(map(int, t["center"] + np.array([15, -15]) * fs))
         cv2.putText(out, label, org, cv2.FONT_HERSHEY_SIMPLEX, fs, (0, 0, 0), int(5 * fs) + 1)
         cv2.putText(out, label, org, cv2.FONT_HERSHEY_SIMPLEX, fs, (255, 255, 255), int(2 * fs) + 1)
@@ -311,16 +323,23 @@ def main() -> int:
         if cell_px < 3:
             print(f"[WARNUNG] nur {cell_px:.1f} px pro Tag-Zelle, unter 3 px wird die Erkennung unzuverlässig")
 
-    ordered, turns, code = [], [], 0
+    ordered, tag_list, code = [], [], 0
+    result_json = Path("strecke.json")
+    names = {1: "kurze Gerade", 2: "mittlere Gerade", 3: "lange Gerade", "L": "Linkskurve", "R": "Rechtskurve"}
     try:
-        tag_list, turns, ordered = build_tag_list(tags)
-        print(f"\ntag_list = {tag_list}\nturns    = {turns}\n")
-        print(" -> ".join(PARTS[i][0] + (f" ({t})" if t else "") for i, t in zip(tag_list, turns)))
+        tag_list, ordered = build_tag_list(tags)
+        print(f"\ntag_list = {tag_list}\n")
+        print(" -> ".join(["Start"] + [names[x] for x in tag_list[1:]]))
+        result_json.write_text(json.dumps({"tag_list": tag_list}) + "\n")
+        print(f"Ergebnis gespeichert: {result_json}")
     except TrackError as e:
         print(f"[FEHLER] {e}")
+        if result_json.exists():  # sonst würde eine alte Strecke versehentlich weiterverwendet
+            result_json.unlink()
+            print(f"[FEHLER] alte {result_json} gelöscht")
         code = 1
 
-    result = draw(frames[-1], tags, ordered, turns)
+    result = draw(frames[-1], tags, ordered, tag_list)
     cv2.imwrite("strecke_ergebnis.png", result)
     print("Ergebnisbild gespeichert: strecke_ergebnis.png")
     if not args.no_window:

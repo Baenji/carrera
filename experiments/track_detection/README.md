@@ -3,12 +3,17 @@
 Erkennt die Strecke aus den AprilTags auf den Schienenteilen und gibt die Reihenfolge der Teile aus.
 
 ```
-tag_list = [0, 1, 3, 4, 4, 3, 4, 4, 2, 2, 4, 4, 1, 4, 4]
-turns    = [None, None, None, 'R', 'R', None, 'L', 'R', None, None, 'R', 'R', None, 'L', 'R']
+tag_list = [1, 3, 'R', 'R', 'L', 3, 'L', 'R', 'R', 3, 1, 'R', 3, 3, 3, 'R']
 ```
 
-`tag_list` enthält die Tag-IDs in Fahrtrichtung, beginnend beim Start. `turns` sagt für jede Kurve, ob sie
-links (`L`) oder rechts (`R`) herum geht. Das steht nicht in der `tag_list`, weil alle Kurven ID 4 haben.
+`tag_list` enthält die Streckenteile in Fahrtrichtung, beginnend beim Start:
+
+| Eintrag | Teil |
+|---|---|
+| `1` / `2` / `3` | kurze / mittlere / lange Gerade |
+| `"L"` / `"R"` | Links- / Rechtskurve |
+
+Der erste Eintrag ist immer der Start. Er steht als `1`, weil er so lang ist wie eine kurze Gerade.
 
 ## Tags und Klebe-Regeln
 
@@ -37,9 +42,22 @@ Namen mit PyAV (braucht `pip install av`). Ohne PyAV geht es auf dem Mac auch ü
 Kamera-Index, z. B. `--device 1`.
 
 Mit Kamera werden 10 Frames aufgenommen. Ein Tag zählt, wenn er in mindestens der Hälfte davon erkannt
-wurde. Das Foto wird als `strecke_foto.png` gespeichert, das Ergebnisbild als `strecke_ergebnis.png`
-(beides im aktuellen Ordner, bitte nicht committen). Auf dem Ergebnisbild stehen Position in der Runde,
-ID und Kurvenrichtung an jedem Tag.
+wurde.
+
+Ausgabe, alles im aktuellen Ordner (bitte nicht committen):
+
+| Datei | Inhalt |
+|---|---|
+| `strecke.json` | `{"tag_list": [1, 3, "R", "R", "L", ...]}`. Wird nur bei Erfolg geschrieben, bei einem Fehler wird eine alte Datei gelöscht. |
+| `strecke_ergebnis.png` | Kontrollbild: Position in der Runde und Eintrag der `tag_list` an jedem Tag |
+| `strecke_foto.png` | das Kamerabild (nur im Kamera-Modus), zum erneuten Auswerten ohne Kamera |
+
+Einlesen im nächsten Schritt:
+
+```python
+import json
+tag_list = json.load(open("strecke.json"))["tag_list"]
+```
 
 | Option | Standard | Bedeutung |
 |---|---|---|
@@ -73,12 +91,11 @@ from pupil_apriltags import Detector
 
 detector = Detector(families="tag36h11", quad_decimate=1.0)
 tags = merge_frames([detect_tags(gray, detector) for gray in graubilder])
-tag_list, turns, _ = build_tag_list(tags)      # wirft TrackError, wenn die Strecke nicht aufgeht
+tag_list, _ = build_tag_list(tags)      # wirft TrackError, wenn die Strecke nicht aufgeht
 ```
 
 ## Offene Punkte
 
-- `CURVE_RADIUS_MM = 173` ist geschätzt (innere Spur 144 mm + halber Spurabstand 29 mm). Gemeint ist der
-  Abstand von der Tag-Mitte zum Kurvenmittelpunkt. Am einfachsten messen: 4 Kurven zum Kreis stecken,
-  Abstand gegenüberliegender Tag-Mitten halbieren. Abweichungen von ±13 mm wurden getestet und stören nicht.
-- Getestet ist das Skript bisher nur mit synthetischen Bildern, noch nicht mit der echten Kamera.
+- `CURVE_RADIUS_MM = 172,5` ergibt sich aus den gemessenen Spurradien (innen 144 mm, außen 201 mm) und gilt,
+  wenn das Kurven-Tag mittig zwischen den Spuren klebt. Abweichungen von ±13 mm wurden getestet und stören nicht.
+- Getestet mit synthetischen Bildern und einem echten 4K-Foto der Strecke (16 Teile, alle richtig erkannt).
