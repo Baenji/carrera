@@ -8,3 +8,6 @@ __pycache__/
 # Godot import cache
 .godot/
 *.egg-info/
+
+# NumPy-Dateien (z.B. aufgenommenes Strecken-Polygon, hängt vom Kameraaufbau ab)
+*.npy

@@ -56,8 +56,9 @@ WINDOW = "Blue Dot Tracking"
 
 # Farbbereich des blauen Punkts in HSV (OpenCV: H 0-179, S und V 0-255).
 # Kalibriert für den dunkleren Punkt bei fester Belichtung von 3,9 ms (siehe DEFAULT_EXPOSURE).
-BLUE_LOW = (104, 110, 40)
-BLUE_HIGH = (118, 255, 255)
+# H oben und S unten mit Puffer: an einer Stelle der Strecke lag der Punkt bei H=118, S=116.
+BLUE_LOW = (104, 90, 40)
+BLUE_HIGH = (125, 255, 255)
 
 IS_WINDOWS = sys.platform == "win32"
 IS_MAC = sys.platform == "darwin"

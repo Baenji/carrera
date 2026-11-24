@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="320" viewBox="0 0 640 320" font-family="Helvetica, Arial, sans-serif" font-size="14">
+  <rect x="0" y="0" width="640" height="320" rx="12" fill="#ffffff"/>
+
+  <!-- ganzes Polygon (geschlossen) -->
+  <polygon points="60,220 120,140 260,100 420,100 560,140 600,220 540,280 120,280" fill="none" stroke="#999" stroke-width="2"/>
+  <g fill="#999">
+    <circle cx="120" cy="140" r="3.5"/><circle cx="260" cy="100" r="3.5"/><circle cx="420" cy="100" r="3.5"/>
+    <circle cx="560" cy="140" r="3.5"/><circle cx="600" cy="220" r="3.5"/><circle cx="540" cy="280" r="3.5"/>
+    <circle cx="120" cy="280" r="3.5"/>
+  </g>
+
+  <!-- Weg s vom Startpunkt bis zum Fußpunkt -->
+  <polyline points="60,220 120,140 260,100 350,100" fill="none" stroke="#1f6fd1" stroke-width="5" stroke-linejoin="round"/>
+  <text x="122" y="112" fill="#1f4f9a">s</text>
+
+  <!-- Startpunkt -->
+  <circle cx="60" cy="220" r="8" fill="#f2c200" stroke="#7a6200" stroke-width="1.5"/>
+  <text x="76" y="226" fill="#222">Startpunkt (0 %)</text>
+
+  <!-- Position des Autos und Lot -->
+  <line x1="350" y1="44" x2="350" y2="100" stroke="#d95926" stroke-width="2" stroke-dasharray="5 4"/>
+  <polyline points="350,90 360,90 360,100" fill="none" stroke="#d95926" stroke-width="1.5"/>
+  <circle cx="350" cy="40" r="7" fill="#d95926"/>
+  <text x="364" y="45" fill="#b0441a">Position des Autos</text>
+  <circle cx="350" cy="100" r="7" fill="#c026d3" stroke="#6b0f75" stroke-width="1.5"/>
+  <text x="364" y="124" fill="#8a1a99">Fußpunkt</text>
+
+  <!-- Formel -->
+  <text x="330" y="190" fill="#222" text-anchor="middle" font-size="16">Fortschritt = s / L</text>
+  <text x="330" y="214" fill="#555" text-anchor="middle">L = Länge der ganzen Runde (grau)</text>
+</svg>

@@ -53,6 +53,20 @@ Geplante Bausteine laut Wiki:
   - Gemessene Rundenzeit des Vorprojekts (≈1,48 s) und Teilemaße: `archiv/CarreraSimulator/track_parts/help.txt`.
 - `.claude/literature/geron_ch18_reinforcement_learning.txt`: Géron, *Hands-On ML* (2. Aufl.), Kapitel 18 „Reinforcement Learning“. Weitere Ressourcen: OpenAI Spinning Up, Hugging Face Deep RL Course, Sutton & Barto, Doku von Gymnasium und Stable-Baselines3.
 
+## Doku-Stil
+
+Konzept-Dokus (Beispiel: `experiments/car_diff_tracking/DOKU.md`) sind Markdown-Dateien neben dem Code, auf Deutsch. Die README daneben bleibt für Bedienung und Installation.
+
+- Konzepte und Entscheidungen erklären („warum so“), kaum Code.
+- Viel visualisieren: Mermaid-Diagramme direkt im Markdown, dazu Screenshots aus dem echten System.
+- Den Weg zur Lösung nur kurz zeigen (Diagramm von links nach rechts, pro Schritt Idee ⇒ Problem). Ausführlich wird nur das Endprodukt erklärt.
+- Ein Übersichtsdiagramm des Endprodukts, die Abschnittsüberschriften entsprechen seinen Kästen. Keine Schrittnummern im Diagramm und im Text.
+- Nichts doppelt darstellen, z. B. keine Kurzfassung, die ein Diagramm weiter unten wiederholt.
+- Nur das eigene Thema. Wo die Komponente in der Gesamtarchitektur sitzt, gehört in eine Doku eine Ebene höher.
+- Prinzipien vor konkreten Zahlen. Werte nur, wo sie zum Verständnis nötig sind, die Standardwerte gesammelt in einer Tabelle.
+- Schlichter Text: keine Emojis, kein Fettdruck, keine Gedankenstriche (vorher den humanizer-Skill drüberlaufen lassen).
+- Diagrammfarben kontrastreich wählen, sie müssen im hellen und im dunklen Modus lesbar sein.
+
 ## Setup
 
 Es gibt keine Tests, keinen Linter und noch keine gemeinsame `requirements.txt` für den Neubau.
