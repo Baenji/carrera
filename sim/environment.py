@@ -11,8 +11,8 @@ class CarreraEnv(gym.Env):
         # Wir haben Lange Gerade (G), kurze Gerade (g), Rechtskurve (R), Linkskurve (L)
         self.TEILE = {
          "G": (342.0, 0.0), "g": (114.0, 0.0),
-         "R": (math.pi / 2 * 226,2, 226,2),
-         "L": (math.pi / 2 * 315,7, 315,7)
+         "R": (math.pi / 2 * 226.2, 226.2),
+         "L": (math.pi / 2 * 315.7, 315.7)
          }
 
         # Wie schaut unsere Strecke aus basiernd auf den definierten Segmenten in self.TEILE
@@ -135,7 +135,7 @@ class CarreraEnv(gym.Env):
         reward = self._speed / self.v_max
 
         if terminated:
-            reward += -50 # entspricht ca. 50-100 Schritten Fahrt; zusätzlich entgehen die restlichen Rewards der Episode
+            reward += -10 # entspricht ca. 50-100 Schritten Fahrt; zusätzlich entgehen die restlichen Rewards der Episode
         
         return self._get_obs(), reward, terminated, truncated, {}
 
