@@ -1,6 +1,6 @@
 # Car to Track: Wie wir die Strecke aus der Fahrt des Autos gewinnen
 
-> Draft, Stand 20.11.2026. Beschreibt `car_to_track.py` auf dem Branch `car_to_track`.
+> Draft, Stand 24.11.2026. Beschreibt `car_to_track.py` auf dem Branch `car_to_track`.
 > Die Bedienung steht im Docstring der Datei, hier geht es um das Warum. Die Position des Autos kommt
 > aus dem Car Tracking, siehe [dessen Doku](../car_diff_tracking/DOKU.md).
 
@@ -79,6 +79,12 @@ gezogen:
 korrigiert = Bildmitte + (gemessen - Bildmitte) · (H - h) / H
 ```
 
+![Korrektur im Kamerabild](img/parallaxe_draufsicht.svg)
+*Kamerabild von oben, Versatz stark übertrieben. Jeder Punkt rutscht auf der Linie zur Bildmitte nach
+innen, immer um denselben Anteil seines Abstands. Punkte am Rand wandern deshalb weit, Punkte nahe der
+Mitte kaum. Farben wie in der Seitenansicht: orange, wo die Kamera den Punkt sieht, blau die Bahn
+darunter.*
+
 Bei unserem Aufbau ist der Faktor 106 / 108 ≈ 0,98. Das klingt nach wenig, am Bildrand sind es aber bis
 zu 12 px.
 
@@ -138,12 +144,55 @@ projiziert:
 
 ![Projektion auf das Polygon](img/fortschritt.svg)
 
-Für jeden Abschnitt zwischen zwei benachbarten Polygonpunkten wird das Lot von der Position auf den
-Abschnitt gefällt. Der Fußpunkt ist die Stelle, an der die Verbindung senkrecht auf den Abschnitt
-trifft. Läge er außerhalb des Abschnitts, wird er auf dessen Anfang oder Ende gesetzt. Von allen
-Abschnitten gewinnt der mit dem kürzesten Abstand. Der Weg s vom Startpunkt bis zum Fußpunkt ist die
-Länge aller Abschnitte davor plus der Anteil des aktuellen. Geteilt durch die Länge L der ganzen Runde
-ergibt das den Fortschritt.
+Gespeichert sind nur die Punkte. Die Abschnitte entstehen erst beim Rechnen, denn zwei benachbarte
+Punkte legen einen Abschnitt schon fest. Der letzte Abschnitt führt zurück zum Startpunkt und schließt
+die Runde. Ohne ihn hätte das Stück zwischen dem letzten aufgenommenen Punkt und dem Start keinen
+Abschnitt, und die Rundenlänge wäre zu kurz.
+
+| Abschnitt | Anfang A | Ende B |
+|---|---|---|
+| 0 | P0 | P1 |
+| 1 | P1 | P2 |
+| … | … | … |
+| N-1 | P(N-1) | P0 |
+
+Auf jeden Abschnitt wird das Lot von der Position gefällt. Der Fußpunkt ist die Stelle, an der die
+Verbindung senkrecht auf den Abschnitt trifft. Seine Lage beschreibt t, der Anteil des Abschnitts von A
+bis zum Fußpunkt: 0 heißt bei A, 1 bei B.
+
+![Lot auf einen Abschnitt](img/projektion.svg)
+*Orange gestrichelt: der Abstand, mit dem dieser Abschnitt in den Vergleich geht.*
+
+Berechnet wird t mit dem Skalarprodukt. Sei v der Vektor von A nach B und w der Vektor von A zur
+Position. Dann ist w · v = |w| · |v| · cos θ, und |w| · cos θ ist genau der Schatten d von w auf dem
+Abschnitt (blau). Geteilt durch die Länge des Abschnitts ergibt sich
+
+```
+t = d / |v| = (w · v) / |v|²
+```
+
+Läge der Fußpunkt auf der Verlängerung des Abschnitts (rechts im Bild), wäre t kleiner als 0 oder
+größer als 1. Dann wird t auf 0 bzw. 1 begrenzt, und der Fußpunkt ist A bzw. B. Ohne diese Grenze würde
+jeder Abschnitt wie eine unendlich lange Gerade behandelt. Ein weit entfernter Abschnitt könnte dann
+gewinnen, nur weil seine Verlängerung nah an der Position vorbeiläuft.
+
+Das Programm rechnet t, Fußpunkt und Abstand für alle Abschnitte gleichzeitig und wählt erst danach den
+mit dem kürzesten Abstand. Ein Beispiel mit drei Abschnitten aus einem längeren Polygon, den Punkten
+P0 (0, 0), P1 (10, 0), P2 (20, 0), P3 (20, 10) und der Position (14, 3):
+
+| Abschnitt | t | t begrenzt | Fußpunkt | Abstand |
+|---|---|---|---|---|
+| P0 → P1 | 1,4 | 1 | (10, 0) | 5 |
+| P1 → P2 | 0,4 | 0,4 | (14, 0) | 3 |
+| P2 → P3 | 0,3 | 0,3 | (20, 3) | 6 |
+
+Der mittlere Abschnitt gewinnt. Dass t bei P2 → P3 zwischen 0 und 1 liegt, reicht also nicht, es
+entscheidet der Abstand.
+
+Der Weg s vom Startpunkt bis zum Fußpunkt ist die Länge aller Abschnitte vor dem Gewinner plus der
+Anteil t des Gewinners. Liegt der Startpunkt bei P0, ist s = 10 + 0,4 · 10 = 14 px. Geteilt durch die
+Länge L der ganzen Runde ergibt das den Fortschritt. Weil dabei Längen addiert und keine Punkte gezählt
+werden, ist ein Prozent immer gleich viel Weg, auch wenn die Punkte unterschiedlich dicht liegen.
 
 Ein seitlicher Abstand verändert den Fortschritt dadurch nicht. Nur an den Ecken des Polygons ist die
 Verbindung zum Eckpunkt nicht ganz senkrecht. Die Punkte liegen aber nur etwa 10 px auseinander, die
@@ -159,8 +208,8 @@ Wird der Punkt nicht erkannt, ist der Fortschritt „nicht erkannt“ und nicht 
 
 | Parameter | Standard | Wirkung |
 |---|---|---|
-| Mindestabstand (`MIN_STEP`) | 5 px | ab welchem Abstand zum letzten Punkt eine Position als neuer Punkt dazukommt |
-| Schließabstand (`CLOSE_DIST`) | 30 px | so nah am Startpunkt gilt die Runde als geschlossen |
+| Mindestabstand (`MIN_POINT_DISTANCE`) | 5 px | ab welchem Abstand zum letzten Punkt eine Position als neuer Punkt dazukommt |
+| Schließabstand (`CLOSE_DISTANCE`) | 30 px | so nah am Startpunkt gilt die Runde als geschlossen |
 | Mindestanzahl Punkte (`MIN_POINTS`) | 100 | verhindert, dass die Runde gleich nach dem Start schließt |
 | Kamerahöhe (`CAMERA_HEIGHT`) | 108 cm | von der Bahn bis zur Kamera. Bei neuem Aufbau neu messen |
 | Höhe des Punkts (`DOT_HEIGHT`) | 2 cm | von der Bahn bis zum blauen Punkt |

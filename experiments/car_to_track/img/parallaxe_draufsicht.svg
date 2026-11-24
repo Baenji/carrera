@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400" font-family="Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="pfeil" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="640" height="400" rx="12" fill="#ffffff"/>
+
+  <!-- Kamerabild -->
+  <text x="40" y="30" fill="#222">Kamerabild</text>
+  <rect x="40" y="40" width="560" height="314" fill="#f3f3f3" stroke="#222" stroke-width="2"/>
+
+  <!-- Linien von der Bildmitte zu den gemessenen Punkten -->
+  <g stroke="#999" stroke-width="1.2" stroke-dasharray="4 4">
+    <line x1="320" y1="197" x2="320" y2="150"/>
+    <line x1="320" y1="197" x2="570" y2="120"/>
+    <line x1="320" y1="197" x2="90" y2="320"/>
+    <line x1="320" y1="197" x2="140" y2="70"/>
+  </g>
+
+  <!-- Bildmitte -->
+  <g stroke="#222" stroke-width="2">
+    <line x1="310" y1="197" x2="330" y2="197"/>
+    <line x1="320" y1="187" x2="320" y2="207"/>
+  </g>
+  <text x="330" y="218" fill="#222">Bildmitte</text>
+
+  <!-- Verschiebung gemessen -> korrigiert (Faktor 0,8 statt 0,98) -->
+  <g stroke="#444" stroke-width="1.8" marker-end="url(#pfeil)">
+    <line x1="562.4" y1="122.4" x2="527.6" y2="133.0"/>
+    <line x1="97.0" y1="316.2" x2="129.0" y2="299.2"/>
+    <line x1="146.5" y1="74.6" x2="169.5" y2="90.8"/>
+  </g>
+
+  <!-- gemessen -->
+  <g fill="#d95926">
+    <circle cx="320" cy="150" r="6"/>
+    <circle cx="570" cy="120" r="6"/>
+    <circle cx="90" cy="320" r="6"/>
+    <circle cx="140" cy="70" r="6"/>
+  </g>
+  <!-- korrigiert -->
+  <g fill="#1f6fd1" stroke="#0b3b7a" stroke-width="1.2">
+    <circle cx="320" cy="159.4" r="6"/>
+    <circle cx="520" cy="135.4" r="6"/>
+    <circle cx="136" cy="295.4" r="6"/>
+    <circle cx="176" cy="95.4" r="6"/>
+  </g>
+
+  <text x="334" y="152" fill="#222">kaum Versatz</text>
+  <text x="576" y="102" fill="#222" text-anchor="end">großer Versatz</text>
+
+  <!-- Legende -->
+  <circle cx="52" cy="377" r="6" fill="#d95926"/>
+  <text x="64" y="382" fill="#222">gemessen</text>
+  <circle cx="160" cy="377" r="6" fill="#1f6fd1" stroke="#0b3b7a" stroke-width="1.2"/>
+  <text x="172" y="382" fill="#222">korrigiert</text>
+  <text x="600" y="382" fill="#555" font-size="12" text-anchor="end">Versatz stark übertrieben</text>
+</svg>
