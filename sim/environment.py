@@ -5,14 +5,14 @@ import math
 
 class CarreraEnv(gym.Env):
 
-    def __init__(self, layout: str = "g R R L G L R R G g R G G G R G"):
+    def __init__(self, layout: str = "1 L L R 3 R L L 3 1 L 3 3 3 L 3"):
         
         # Streckensegmente werden durch (Länge, Radius) angegeben
-        # Wir haben Lange Gerade (G), kurze Gerade (g), Rechtskurve (R), Linkskurve (L)
+        # Geraden: kurz (1), mittel (2), lang (3); Kurven: Linkskurve (L, innen), Rechtskurve (R, außen)
         self.TEILE = {
-         "G": (342.0, 0.0), "g": (114.0, 0.0),
-         "R": (math.pi / 2 * 226.2, 226.2),
-         "L": (math.pi / 2 * 315.7, 315.7)
+         "3": (342.0, 0.0), "1": (114.0, 0.0), "2": (171.0, 0.0),
+         "L": (math.pi / 2 * 226.2, 226.2),
+         "R": (math.pi / 2 * 315.7, 315.7)
          }
 
         # Wie schaut unsere Strecke aus basiernd auf den definierten Segmenten in self.TEILE
