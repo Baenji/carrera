@@ -10,16 +10,16 @@
   <rect x="0" y="0" width="640" height="280" rx="12" fill="#ffffff"/>
   <line x1="320" y1="20" x2="320" y2="262" stroke="#e0e0e0" stroke-width="1.5"/>
 
-  <!-- ===== links: Fußpunkt liegt auf dem Abschnitt (t = 0,3) ===== -->
+  <!-- ===== links: Fußpunkt liegt auf dem Abschnitt (Anteil 0,3) ===== -->
   <text x="20" y="34" fill="#222">Fußpunkt auf dem Abschnitt</text>
 
   <!-- Abschnitt als Vektor v von A nach B -->
   <line x1="50" y1="210" x2="284" y2="210" stroke="#555" stroke-width="2.5" marker-end="url(#pfeil-grau)"/>
   <text x="240" y="202" fill="#333">v</text>
 
-  <!-- Schatten d von w auf dem Abschnitt -->
+  <!-- Schatten von w auf dem Abschnitt -->
   <line x1="50" y1="210" x2="122" y2="210" stroke="#1f6fd1" stroke-width="5"/>
-  <text x="86" y="202" fill="#1f4f9a" text-anchor="middle">d</text>
+  <text x="93" y="203" fill="#1f4f9a" text-anchor="middle" font-size="12">Schatten</text>
 
   <!-- Vektor w von A zur Position -->
   <line x1="50" y1="210" x2="117.1" y2="107.5" stroke="#d95926" stroke-width="2" marker-end="url(#pfeil-orange)"/>
@@ -41,12 +41,12 @@
     <text x="290" y="236">B</text>
   </g>
   <g fill="#555" text-anchor="middle" font-size="13">
-    <text x="50" y="256">t = 0</text>
-    <text x="122" y="256">t = 0,3</text>
-    <text x="290" y="256">t = 1</text>
+    <text x="50" y="256">Anteil 0</text>
+    <text x="122" y="256">Anteil 0,3</text>
+    <text x="290" y="256">Anteil 1</text>
   </g>
 
-  <!-- ===== rechts: Fußpunkt läge hinter B (t = 1,4) ===== -->
+  <!-- ===== rechts: Fußpunkt läge hinter B (Anteil 1,4) ===== -->
   <text x="340" y="34" fill="#222">Fußpunkt außerhalb: auf B begrenzt</text>
 
   <!-- Verlängerung über B hinaus -->
@@ -73,8 +73,8 @@
     <text x="530" y="236">B = Fußpunkt</text>
   </g>
   <g fill="#555" text-anchor="middle" font-size="13">
-    <text x="370" y="256">t = 0</text>
-    <text x="530" y="256">t = 1</text>
-    <text x="594" y="256">t = 1,4</text>
+    <text x="370" y="256">Anteil 0</text>
+    <text x="530" y="256">Anteil 1</text>
+    <text x="594" y="256">Anteil 1,4</text>
   </g>
 </svg>

@@ -65,9 +65,21 @@ flowchart TD
 ```
 
 
-| Kamerabild mit erkanntem Punkt | Differenzmaske (Ansicht 1) | Blau-Maske (Ansicht 2) |
-|---|---|---|
-| ![Kamerabild](img/02_kamerabild_auto.png) | ![Differenzmaske](img/03_differenzmaske.png) | ![Blau-Maske](img/04_blaumaske.png) |
+<table>
+<tr>
+<th width="33%">Kamerabild mit erkanntem Punkt</th>
+<th width="33%">Differenzmaske (Ansicht 1)</th>
+<th width="33%">Blau-Maske (Ansicht 2)</th>
+</tr>
+<tr>
+<td><img src="img/01_kamerabild.png" alt="Kamerabild" width="100%"></td>
+<td><img src="img/02_differenzmaske.png" alt="Differenzmaske" width="100%"></td>
+<td><img src="img/03_blaumaske.png" alt="Blau-Maske" width="100%"></td>
+</tr>
+</table>
+
+*Roter Ring: erkannter Punkt. In der Differenzmaske ist das ganze Auto weiß, in der Blau-Maske nur der
+Punkt.*
 
 ### Kamera vorbereiten
 
@@ -84,12 +96,6 @@ dunkler. Farbbereich und Schwellwert sind deshalb auf genau diese Belichtung abg
 Auch die Bildrate zählt: Je mehr Bilder pro Sekunde, desto kürzer ist das Stück, das das Auto zwischen
 zwei Messungen fährt.
 
-| Lange Belichtung | Kurze Belichtung |
-|---|---|
-| ![Punkt bei langer Belichtung](img/11_unschaerfe_lang.png) | ![Punkt bei kurzer Belichtung](img/12_unschaerfe_kurz.png) |
-
-*Ausschnitt um den Punkt bei voller Fahrt.*
-
 ### Referenzbild aufnehmen
 
 Direkt nach dem Start werden die ersten 30 Bilder gemittelt. Die Kamera liefert nie zweimal exakt
@@ -100,8 +106,6 @@ Die Strecke muss dafür nicht leer sein. Was beim Start im Bild ist, zum Beispie
 Nachführen (siehe unten) nach Sekundenbruchteilen wieder heraus. Einen Haken gibt es: Steht das Auto
 beim Start schon auf der Strecke, gehört es zum Referenzbild und gilt nicht als „neu“. Es wird erst
 erkannt, sobald es losfährt. Danach bleibt es auch im Stand erkannt, weil der Schutzkreis es schützt.
-
-![Referenzbild](img/01_referenzbild.png)
 
 ### Ist das neu? Die Differenzmaske
 
@@ -167,19 +171,10 @@ Die beiden Masken werden mit UND verknüpft. Übrig bleibt nur, was neu und glei
 | neu | erkannt: der Punkt auf unserem Auto | ignoriert: Hand, Schatten, Auto des Besuchers |
 | schon im Referenzbild | ignoriert: blaue Dinge neben der Strecke | ignoriert: Strecke, Tisch, Boden |
 
-| Hand im Bild: Differenzmaske | gleiche Szene: Blau-Maske |
-|---|---|
-| ![Hand in der Differenzmaske](img/06_hand_differenz.png) | ![Hand in der Blau-Maske](img/07_hand_blau.png) |
-
-*Die Hand ist neu, aber nicht blau, und wird ignoriert.*
-
 Im Ergebnis werden zusammenhängende Flecken gesucht. Der größte zählt, wenn er mindestens 15 px hat,
 kleinere sind Rauschen. Die Position ist der Schwerpunkt des Flecks, also der Mittelwert der x- und
 y-Koordinaten all seiner Pixel. Gibt es keinen passenden Fleck, ist das Ergebnis `None` („nicht
 erkannt“). Im Vorprojekt wurde in diesem Fall `(0, 0)` weitergegeben.
-
-![Erkannter Punkt](img/05_punkt_erkannt.png)
-*Roter Ring: erkannter Punkt, Mittelpunkt als einzelnes Pixel.*
 
 ### Referenzbild nachführen
 
@@ -218,14 +213,22 @@ um die letzte Position des blauen Punkts unverändert, der Schutzkreis.
   Hand geschützt statt unseres Autos.
 - Geht der Punkt kurz verloren, bleibt der Kreis an der letzten bekannten Position.
 
+<table>
+<tr>
+<th width="50%">Hand hineingehalten</th>
+<th width="50%">kurz danach</th>
+</tr>
+<tr>
+<td><img src="img/04_hand_neu.png" alt="Hand in der Differenzmaske" width="100%"></td>
+<td><img src="img/05_hand_weg.png" alt="Hand verschwunden" width="100%"></td>
+</tr>
+</table>
+
+*Differenzmaske. Die Hand bleibt still liegen und verschwindet nach Sekundenbruchteilen, weil das
+Referenzbild nachzieht. Das Auto steht ebenfalls still, bleibt aber dank Schutzkreis sichtbar.*
+
 Das Referenzbild wird intern mit Kommazahlen gespeichert. Bei Ganzzahlen würden 5 % einer kleinen
 Abweichung (5 % von 8 sind 0,4) jedes Mal auf 0 abgerundet, und das Referenzbild würde sich nie bewegen.
-
-| Gegenstand gerade abgelegt | ca. 1 s später | Auto steht still |
-|---|---|---|
-| ![Gegenstand neu](img/08_gegenstand_neu.png) | ![Gegenstand verschwunden](img/09_gegenstand_weg.png) | ![Stehendes Auto](img/10_auto_steht.png) |
-
-*Differenzmaske. Rechts: Das stehende Auto bleibt dank Schutzkreis sichtbar.*
 
 ### Stellschrauben
 

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="270" viewBox="0 0 640 270" font-family="Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="pfeil" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="640" height="270" rx="12" fill="#ffffff"/>
+
+  <!-- Zeitfenster -->
+  <rect x="358" y="48" width="174" height="182" fill="#dbe8fb"/>
+  <text x="445" y="40" fill="#1f4f9a" text-anchor="middle">Zeitfenster 0,1 s</text>
+
+  <!-- Achsen -->
+  <line x1="70" y1="230" x2="610" y2="230" stroke="#444" stroke-width="1.5" marker-end="url(#pfeil)"/>
+  <line x1="70" y1="230" x2="70" y2="30" stroke="#444" stroke-width="1.5" marker-end="url(#pfeil)"/>
+  <text x="80" y="38" fill="#222">Fortschritt</text>
+  <text x="610" y="252" fill="#222" text-anchor="end">Zeit</text>
+  <line x1="520" y1="226" x2="520" y2="234" stroke="#444" stroke-width="1.5"/>
+  <text x="520" y="252" fill="#222" text-anchor="middle">jetzt</text>
+
+  <!-- von Bild zu Bild -->
+  <polyline points="100,210 130,204.5 160,185 190,181.5 220,162 250,159.5 280,152 310,133.5 340,130 370,110.5 400,109 430,90.5 460,89 490,70.5 520,65"
+            fill="none" stroke="#999" stroke-width="1.2"/>
+  <text x="170" y="214" fill="#666" font-size="13">von Bild zu Bild unruhig</text>
+
+  <!-- ältester und neuester Wert im Fenster -->
+  <line x1="370" y1="110.5" x2="520" y2="65" stroke="#d95926" stroke-width="2.5"/>
+
+  <!-- Werte außerhalb des Fensters -->
+  <g fill="#ffffff" stroke="#999" stroke-width="1.5">
+    <circle cx="100" cy="210" r="4"/>
+    <circle cx="130" cy="204.5" r="4"/>
+    <circle cx="160" cy="185" r="4"/>
+    <circle cx="190" cy="181.5" r="4"/>
+    <circle cx="220" cy="162" r="4"/>
+    <circle cx="250" cy="159.5" r="4"/>
+    <circle cx="280" cy="152" r="4"/>
+    <circle cx="310" cy="133.5" r="4"/>
+    <circle cx="340" cy="130" r="4"/>
+  </g>
+  <!-- Werte im Fenster -->
+  <g fill="#1f6fd1">
+    <circle cx="370" cy="110.5" r="5"/>
+    <circle cx="400" cy="109" r="5"/>
+    <circle cx="430" cy="90.5" r="5"/>
+    <circle cx="460" cy="89" r="5"/>
+    <circle cx="490" cy="70.5" r="5"/>
+    <circle cx="520" cy="65" r="5"/>
+  </g>
+
+  <g fill="#b0441a" text-anchor="middle" font-size="13">
+    <text x="445" y="160">Steigung der orangen Linie</text>
+    <text x="445" y="178">= Geschwindigkeit</text>
+  </g>
+</svg>

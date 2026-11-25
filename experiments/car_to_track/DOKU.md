@@ -1,13 +1,9 @@
-# Car to Track: Wie wir die Strecke aus der Fahrt des Autos gewinnen
+# Car to Track: Strecke, Fortschritt und Geschwindigkeit aus der Fahrt des Autos
 
-> Draft, Stand 24.11.2026. Beschreibt `car_to_track.py` auf dem Branch `car_to_track`.
-> Die Bedienung steht im Docstring der Datei, hier geht es um das Warum. Die Position des Autos kommt
-> aus dem Car Tracking, siehe [dessen Doku](../car_diff_tracking/DOKU.md).
+> Draft, Stand 24.11.2026. Beschreibt `car_to_track.py` und `car_speed.py` auf dem Branch `car_to_track`.
+> Die Bedienung steht in den Docstrings der Dateien, hier geht es um das Warum. Die Position des Autos
+> kommt aus dem Car Tracking, siehe [dessen Doku](../car_diff_tracking/DOKU.md).
 
-Das Experiment liefert zwei Dinge: ein Polygon der Strecke, also die Pixelpunkte der Spur in
-Fahrtrichtung, und für jedes Kamerabild den Fortschritt des Autos als Anteil einer Runde oder
-ausdrücklich „nicht erkannt“. Für das Polygon reicht eine langsam gefahrene Runde. Das Auto fährt die
-Strecke ab, seine Positionen sind also schon die Strecke.
 
 ## Der Weg zur Lösung
 
@@ -15,29 +11,32 @@ Strecke ab, seine Positionen sind also schon die Strecke.
 flowchart LR
     V["<b>Vorprojekt</b><br/>Polygon durch die<br/>AprilTag-Mittelpunkte"]
     I1["<b>1</b> · 20.11.<br/>gefahrene Runde<br/>als Polygon"]
-    I2["<b>2</b> · 20.11.<br/>Blau-Bereich<br/>erweitert"]
-    I3["<b>3</b> · 20.11.<br/>Parallaxe<br/>herausrechnen"]
-    I4["<b>4</b> · 20.11.<br/>Fortschritt<br/>in %"]
+    I2["<b>2</b> · 20.11.<br/>Parallaxe<br/>herausrechnen"]
+    I3["<b>3</b> · 20.11.<br/>Fortschritt<br/>in %"]
+    I4["<b>4</b> · 24.11.<br/>Geschwindigkeit<br/>aus den Teilemaßen<br/><i>car_speed.py</i>"]
     V -->|"⇒ schneidet<br/>Kurven ab"| I1
-    I1 -->|"⇒ Lücke, Punkt<br/>nicht erkannt"| I2
-    I2 -->|"⇒ am Bildrand<br/>neben der Spur"| I3
-    I3 -->|"⇒ wie weit ist<br/>das Auto?"| I4
+    I1 -->|"⇒ am Bildrand<br/>neben der Spur"| I2
+    I2 -->|"⇒ wie weit ist<br/>das Auto?"| I3
+    I3 -->|"⇒ wie schnell<br/>fährt es?"| I4
 ```
 
 Das Vorprojekt hat den Fortschritt auf einem Polygon durch die Mittelpunkte der AprilTags berechnet.
 Die Verbindungslinien zwischen den Tags schneiden jede Kurve ab, mit der gefahrenen Linie hatte das
-Polygon wenig zu tun.
+Polygon wenig zu tun. Die Geschwindigkeit kam aus Godot. Dort fuhr ein simuliertes Auto nach dem
+Throttle weiter und wurde nur 5-mal pro Sekunde auf den gemessenen Fortschritt gesetzt, die
+Geschwindigkeit war also größtenteils simuliert und nicht gemessen.
 
 1. Wir nehmen eine Runde lang die Positionen des blauen Punkts auf. Weil das Auto der Spur folgt, liegen
-   sie schon in Fahrtrichtung vor und bilden direkt das Polygon. ⇒ An einer Stelle fehlten mehrere
-   Punkte, und das Polygon überbrückte die Lücke mit einer geraden Kante.
-2. Der Farbton des Punkts lag dort genau auf der Obergrenze des Blau-Bereichs. Wir haben den Bereich im
-   Car Tracking erweitert, die Werte stehen in dessen Doku. ⇒ Zum Bildrand hin lag das Polygon
+   sie schon in Fahrtrichtung vor und bilden direkt das Polygon. ⇒ Zum Bildrand hin lag das Polygon
    sichtbar außen neben der Spur, und zwar umso mehr, je weiter vom Bildmittelpunkt entfernt.
-3. Die Ursache ist die Parallaxe, der Punkt liegt höher als die Bahn. Jede Position wird jetzt auf die
+2. Die Ursache ist die Parallaxe, der Punkt liegt höher als die Bahn. Jede Position wird jetzt auf die
    Stelle der Bahn direkt darunter zurückgerechnet. ⇒ Das Polygon allein sagt noch nicht, wie weit das
    Auto auf der Runde ist.
-4. Die aktuelle Position wird auf das Polygon projiziert. Daraus ergibt sich der Fortschritt in Prozent.
+3. Die aktuelle Position wird auf das Polygon projiziert. Daraus ergibt sich der Fortschritt in Prozent.
+   ⇒ Für eine Geschwindigkeit fehlt ein echter Maßstab. Wie viele Millimeter ein Pixel ist, hängt
+   davon ab, wie hoch die Kamera hängt.
+4. Die Länge der Spur in Millimetern berechnen wir aus den Streckenteilen, die in einer Config stehen.
+   Mit ihr wird aus der Änderung des Fortschritts eine Geschwindigkeit in Millimetern pro Sekunde.
 
 ---
 
@@ -46,15 +45,18 @@ Polygon wenig zu tun.
 ```mermaid
 flowchart TD
     T["Car Tracking<br/>Position des blauen Punkts<br/>oder 'nicht erkannt'"] --> P["<b>Parallaxe korrigieren</b><br/>Position auf die Bahn<br/>darunter zurückrechnen"]
-    P -->|"Taste r, eine Runde lang"| A["<b>Runde aufnehmen</b><br/>Positionen in Fahrtreihenfolge<br/>sammeln, bis das Auto<br/>wieder am Start ist"]
+    P -->|"Taste r"| A["<b>Runde aufnehmen</b><br/>Positionen in Fahrtreihenfolge<br/>sammeln, bis das Auto<br/>wieder am Start ist"]
     A --> POLY[("Polygon<br/>track_polygon.npy")]
     P -->|"sobald ein Polygon da ist"| FS["<b>Fortschritt berechnen</b><br/>Position auf das Polygon projizieren<br/>→ Anteil der Runde oder 'nicht erkannt'"]
     POLY --> FS
+    CFG[("Streckenteile<br/>strecke.json")] --> L["<b>Spurlänge berechnen</b><br/>Längen der Teile addieren<br/>→ Länge der Runde in mm"]
+    FS --> V["<b>Geschwindigkeit berechnen</b><br/>Änderung des Fortschritts im Zeitfenster<br/>· Spurlänge → mm/s oder 'keine'"]
+    L --> V
 ```
 
-![Polygon und Fortschritt im Kamerabild](img/05_fortschritt.png)
-*Grün: Polygon. Gelb: Startpunkt. Magenta: Position des Autos auf dem Polygon. Oben links der
-Fortschritt.*
+![Polygon, Fortschritt und Geschwindigkeit im Kamerabild](img/05_fortschritt.png)
+*Grün: Polygon. Gelb: Startpunkt. Magenta: Position des Autos auf dem Polygon. Oben links Fortschritt
+und Geschwindigkeit.*
 
 ### Parallaxe korrigieren
 
@@ -88,8 +90,8 @@ darunter.*
 Bei unserem Aufbau ist der Faktor 106 / 108 ≈ 0,98. Das klingt nach wenig, am Bildrand sind es aber bis
 zu 12 px.
 
-Für den Fortschritt allein wäre die Korrektur nicht nötig, denn die Live-Position hat denselben Versatz
-wie das Polygon. Sobald wir das Polygon mit der echten Strecke vergleichen, etwa mit den AprilTags oder
+Für Fortschritt und Geschwindigkeit allein wäre die Korrektur nicht nötig, denn die Live-Position hat
+denselben Versatz wie das Polygon. Sobald wir das Polygon mit der echten Strecke vergleichen, etwa mit den AprilTags oder
 den Teilemaßen in Millimetern, zählt aber jeder systematische Fehler.
 
 Die Rechnung nimmt an, dass die Kamera genau senkrecht nach unten schaut und die Bildmitte die Stelle
@@ -101,14 +103,14 @@ Kamera leicht schräg.
 | ![Äußere Kurve](img/03_ecke_aussen.png) | ![Innere Kurve](img/04_kurve_innen.png) |
 
 *Polygon vor der Korrektur. Links liegt es außen neben der Spur, das ist die Parallaxe. Rechts schneidet
-es die Kurve nach innen. Das hat eine andere Ursache, siehe Grenzen.*
+es die Kurve nach innen. Das hat eine andere Ursache: Der Punkt klebte damals hinter dem Leitkiel, und
+der Rest des Autos fährt wie der Anhänger eines LKW einen engeren Bogen als der Kiel. Seit der Punkt über
+dem Kiel sitzt, folgt das Polygon auch in den Kurven der Spur.*
 
 ### Runde aufnehmen
 
 Die Positionen kommen in der Reihenfolge, in der das Auto die Strecke abfährt. Eine Runde lang
-gesammelt, sind sie schon das fertige Polygon. Sortieren muss man nichts. Ein nachträgliches Sortieren,
-etwa indem man immer den nächstgelegenen Punkt anhängt, würde an einer Kreuzung scheitern: Dort liegen
-zwei Teile der Strecke übereinander, und das Verfahren könnte falsch abbiegen.
+gesammelt, sind sie schon das fertige Polygon. Sortieren muss man nichts.
 
 Ein neuer Punkt kommt erst dazu, wenn er mindestens 5 px vom letzten entfernt ist. Steht das Auto,
 entsteht so kein Punkthaufen, und langsame Stellen bekommen nicht mehr Punkte als schnelle. Bilder, in
@@ -119,8 +121,8 @@ Die Runde ist geschlossen, sobald das Auto wieder weniger als 30 px vom Startpun
 Außerdem müssen mindestens 100 Punkte da sein. Sonst wäre die Runde gleich nach dem Start schon
 geschlossen, weil das Auto dann noch neben dem Startpunkt fährt.
 
-Gespeichert wird ein NumPy-Array mit N Zeilen und 2 Spalten. Zeile i ist der i-te Punkt in
-Fahrtrichtung, die Spalten sind x und y in Pixeln. Beim nächsten Start wird die Datei automatisch
+Gespeichert wird ein NumPy-Array mit N Zeilen und 2 Spalten. Jede Zeile ist ein Punkt, die Zeilen
+liegen in Fahrtrichtung, die Spalten sind x und y in Pixeln. Beim nächsten Start wird die Datei automatisch
 geladen. Die Pixel gelten nur für genau diesen Kameraaufbau, deshalb ist die Datei nicht im Git.
 
 Die Runde sollte langsam und gleichmäßig gefahren werden. Bei voller Fahrt verschmiert der Punkt
@@ -157,52 +159,108 @@ Abschnitt, und die Rundenlänge wäre zu kurz.
 | N-1 | P(N-1) | P0 |
 
 Auf jeden Abschnitt wird das Lot von der Position gefällt. Der Fußpunkt ist die Stelle, an der die
-Verbindung senkrecht auf den Abschnitt trifft. Seine Lage beschreibt t, der Anteil des Abschnitts von A
-bis zum Fußpunkt: 0 heißt bei A, 1 bei B.
+Verbindung senkrecht auf den Abschnitt trifft. Seine Lage beschreibt der Anteil des Abschnitts von A
+bis zum Fußpunkt (im Code `fraction_along_segment`): 0 heißt bei A, 1 bei B.
 
 ![Lot auf einen Abschnitt](img/projektion.svg)
 *Orange gestrichelt: der Abstand, mit dem dieser Abschnitt in den Vergleich geht.*
 
-Berechnet wird t mit dem Skalarprodukt. Sei v der Vektor von A nach B und w der Vektor von A zur
-Position. Dann ist w · v = |w| · |v| · cos θ, und |w| · cos θ ist genau der Schatten d von w auf dem
-Abschnitt (blau). Geteilt durch die Länge des Abschnitts ergibt sich
+Berechnet wird der Anteil mit dem Skalarprodukt. Sei v der Vektor von A nach B, w der Vektor von A zur
+Position und θ der Winkel zwischen beiden. Dann ist w · v = |w| · |v| · cos θ, und |w| · cos θ ist genau
+der Schatten von w auf dem Abschnitt (blau). Geteilt durch die Länge des Abschnitts ergibt sich
 
 ```
-t = d / |v| = (w · v) / |v|²
+Anteil = Schatten / |v| = (w · v) / |v|²
 ```
 
-Läge der Fußpunkt auf der Verlängerung des Abschnitts (rechts im Bild), wäre t kleiner als 0 oder
-größer als 1. Dann wird t auf 0 bzw. 1 begrenzt, und der Fußpunkt ist A bzw. B. Ohne diese Grenze würde
+Läge der Fußpunkt auf der Verlängerung des Abschnitts (rechts im Bild), wäre der Anteil kleiner als 0
+oder größer als 1. Dann wird er auf 0 bzw. 1 begrenzt, und der Fußpunkt ist A bzw. B. Ohne diese Grenze würde
 jeder Abschnitt wie eine unendlich lange Gerade behandelt. Ein weit entfernter Abschnitt könnte dann
 gewinnen, nur weil seine Verlängerung nah an der Position vorbeiläuft.
 
-Das Programm rechnet t, Fußpunkt und Abstand für alle Abschnitte gleichzeitig und wählt erst danach den
+Das Programm rechnet Anteil, Fußpunkt und Abstand für alle Abschnitte gleichzeitig und wählt erst danach den
 mit dem kürzesten Abstand. Ein Beispiel mit drei Abschnitten aus einem längeren Polygon, den Punkten
 P0 (0, 0), P1 (10, 0), P2 (20, 0), P3 (20, 10) und der Position (14, 3):
 
-| Abschnitt | t | t begrenzt | Fußpunkt | Abstand |
+| Abschnitt | Anteil | Anteil begrenzt | Fußpunkt | Abstand |
 |---|---|---|---|---|
 | P0 → P1 | 1,4 | 1 | (10, 0) | 5 |
 | P1 → P2 | 0,4 | 0,4 | (14, 0) | 3 |
 | P2 → P3 | 0,3 | 0,3 | (20, 3) | 6 |
 
-Der mittlere Abschnitt gewinnt. Dass t bei P2 → P3 zwischen 0 und 1 liegt, reicht also nicht, es
-entscheidet der Abstand.
+Der mittlere Abschnitt gewinnt. Dass der Anteil bei P2 → P3 zwischen 0 und 1 liegt, reicht also
+nicht, es entscheidet der Abstand.
 
-Der Weg s vom Startpunkt bis zum Fußpunkt ist die Länge aller Abschnitte vor dem Gewinner plus der
-Anteil t des Gewinners. Liegt der Startpunkt bei P0, ist s = 10 + 0,4 · 10 = 14 px. Geteilt durch die
-Länge L der ganzen Runde ergibt das den Fortschritt. Weil dabei Längen addiert und keine Punkte gezählt
+Der zurückgelegte Weg vom Startpunkt bis zum Fußpunkt (`distance_travelled`) ist die Länge aller
+Abschnitte vor dem Gewinner plus der Anteil des Gewinners an dessen Länge. Liegt der Startpunkt bei P0,
+sind das 10 + 0,4 · 10 = 14 px. Geteilt durch die Länge der ganzen Runde (`lap_length`) ergibt das den
+Fortschritt. Weil dabei Längen addiert und keine Punkte gezählt
 werden, ist ein Prozent immer gleich viel Weg, auch wenn die Punkte unterschiedlich dicht liegen.
 
-Ein seitlicher Abstand verändert den Fortschritt dadurch nicht. Nur an den Ecken des Polygons ist die
-Verbindung zum Eckpunkt nicht ganz senkrecht. Die Punkte liegen aber nur etwa 10 px auseinander, die
-Knicke sind also flach und der Fehler vernachlässigbar.
-
-Die Live-Position wird vorher genauso um die Parallaxe korrigiert wie die Punkte des Polygons. Ein
-Polygon, das ohne Korrektur aufgenommen wurde, passt deshalb nicht mehr dazu und muss neu aufgenommen
-werden.
-
 Wird der Punkt nicht erkannt, ist der Fortschritt „nicht erkannt“ und nicht der letzte bekannte Wert.
+
+### Spurlänge berechnen
+
+Der Fortschritt ist ein Anteil der Runde und hat keine Einheit. Für eine Geschwindigkeit in Millimetern
+pro Sekunde braucht es die Länge der Runde in Millimetern. Aus dem Polygon lässt sie sich nicht ablesen,
+denn es kennt nur Pixel. Die echte Strecke ist aber aus Teilen mit bekannten Maßen gebaut (siehe Wiki,
+[Überarbeitung Streckenerkennung](https://app.notion.com/p/417946076ebb8085a4f0c081f6cc3afa)), ihre
+Länge ist die Summe dieser Teile.
+
+Bis die Streckenerkennung die Teile über die AprilTags liefert, tragen wir sie von Hand in eine Config
+ein (`strecke.json`):
+
+```json
+{
+  "spur": "rechts",
+  "teile": ["start", "lang", "R", "R", "L", "lang", ...]
+}
+```
+
+Unter `teile` stehen die Streckenteile in Fahrtrichtung ab dem Start, unter `spur` die Spur, auf der das
+Auto fährt. Die Spur braucht es, weil die innere Spur einer Kurve kürzer ist als die äußere. Sie muss die
+sein, auf der das Polygon aufgenommen wurde, sonst passt die Länge nicht zum Polygon.
+
+### Geschwindigkeit berechnen
+
+Steigt der Fortschritt in einer bestimmten Zeit um einen Anteil der Runde, hat das Auto denselben Anteil
+der Spurlänge zurückgelegt:
+
+```
+Geschwindigkeit = Änderung des Fortschritts · Spurlänge / vergangene Zeit
+```
+
+Ist die Spur zum Beispiel 4,27 m lang und steigt der Fortschritt in 0,1 s um 2 %, ist das Auto
+0,02 · 4270 mm ≈ 85 mm gefahren, also etwa 0,85 m/s.
+
+Die Pixel des Polygons werden dabei nie einzeln in Millimeter umgerechnet. Rechnerisch ist es aber
+dasselbe, als würde man die ganze Runde mit einem einzigen Faktor umrechnen: Spurlänge in Millimetern
+geteilt durch Länge des Polygons in Pixeln. Das stimmt nur, wenn ein Prozent des Polygons überall auch
+ein Prozent der echten Spur ist. Wo das nicht gilt, steht unter Grenzen.
+
+Von einem Kamerabild zum nächsten vergehen bei 60 fps nur etwa 17 ms. In dieser Zeit fährt das Auto
+nur wenige Pixel weit, und die erkannte Position wackelt um ein, zwei Pixel. Die Geschwindigkeit von
+Bild zu Bild springt deshalb stark. Stattdessen werden die Paare aus Zeit und Fortschritt der letzten
+0,1 s gesammelt, und nur der älteste und der neueste Wert gehen in die Formel ein.
+
+![Geschwindigkeit über das Zeitfenster](img/geschwindigkeit.svg)
+*Jeder Punkt ist der Fortschritt in einem Kamerabild. Hohl: Werte, die älter als das Zeitfenster sind
+und herausgefallen sind.*
+
+Dafür hinkt der Wert etwa eine halbe Fensterlänge hinterher, denn er beschreibt eher die Mitte des
+Fensters als den aktuellen Moment. Ein größeres Fenster macht die Geschwindigkeit ruhiger, aber träger.
+
+An der Startlinie springt der Fortschritt von knapp 100 % auf knapp 0 %. Von 99 % auf 1 % wäre die
+Änderung -98 %, das Auto würde scheinbar sehr schnell rückwärts fahren. Deshalb wird jede Änderung, die
+außerhalb von -50 % bis +50 % liegt, um eine ganze Runde verschoben, aus -98 % werden so +2 %. Eindeutig
+ist das, weil das Auto in 0,1 s nie eine halbe Runde schafft. Kleine Rücksprünge durch das Wackeln
+bleiben kleine negative Werte. Steht das Auto, schwankt die Geschwindigkeit deshalb leicht um null.
+
+Bilder, in denen das Auto nicht erkannt wird, liefern keinen Wert. Ein kurzer Aussetzer innerhalb des
+Fensters fällt deshalb kaum auf, die nächste Geschwindigkeit rechnet über die Lücke hinweg. Dauert er
+länger als das Fenster, sind danach alle alten Werte herausgefallen. Dann gibt es keine
+Geschwindigkeit, bis wieder zwei Werte im Fenster liegen. Die letzte bekannte wird nicht weiter
+angezeigt.
 
 ### Stellschrauben
 
@@ -213,20 +271,20 @@ Wird der Punkt nicht erkannt, ist der Fortschritt „nicht erkannt“ und nicht 
 | Mindestanzahl Punkte (`MIN_POINTS`) | 100 | verhindert, dass die Runde gleich nach dem Start schließt |
 | Kamerahöhe (`CAMERA_HEIGHT`) | 108 cm | von der Bahn bis zur Kamera. Bei neuem Aufbau neu messen |
 | Höhe des Punkts (`DOT_HEIGHT`) | 2 cm | von der Bahn bis zum blauen Punkt |
+| Streckenconfig (`--strecke`) | `strecke.json` | Streckenteile und Spur für die Spurlänge |
+| Zeitfenster (`SPEED_WINDOW_SECONDS`) | 0,1 s | über diese Zeit wird die Geschwindigkeit gemittelt. Größer ist ruhiger, aber träger |
 
 
 ## Grenzen und offene Punkte
 
-- In Kurven schneidet das Polygon nach innen (Bild oben, rechts). Der Punkt klebt hinter dem Leitkiel.
-  Der Kiel läuft in der Spur, der Rest des Autos fährt wie der Anhänger eines LKW einen engeren Bogen.
-  Abhilfe wäre, den Punkt möglichst weit vorne mittig über den Kiel zu kleben. Das ist noch offen.
-- Das Polygon ist die Mittellinie der Spur, auf der das Auto fährt, nicht die Mitte der Strecke. Für
-  die zweite Spur braucht es eine eigene Runde.
-- Alles ist in Pixeln. Wird die Kamera bewegt, muss die Runde neu aufgenommen werden.
-- An einer Kreuzung ist der nächstgelegene Abschnitt nicht eindeutig, der Fortschritt kann dort
-  springen. Unsere aktuelle Strecke hat keine Kreuzung.
+- Das Polygon ist in Pixeln. Wird die Kamera bewegt, muss die Runde neu aufgenommen werden.
 - Der Vergleich mit der echten Geometrie (AprilTags, Teilemaße in Millimetern) fehlt noch. Dabei kann es
   nötig werden, die Verzerrung des Weitwinkelobjektivs herauszurechnen, zum Beispiel mit einer
   Kamerakalibrierung über ein Schachbrettmuster.
-- Die Geschwindigkeit entlang der Strecke fehlt bewusst. Sinnvoll wird sie erst mit den Teilemaßen in
-  Millimetern aus der Streckenerkennung.
+- Die Geschwindigkeit setzt voraus, dass ein Prozent des Polygons überall ein Prozent der echten Spur
+  ist. Wo das Polygon gestaucht ist, etwa durch die Verzerrung des Objektivs zum Bildrand hin, zeigt
+  die Geschwindigkeit zu wenig an, an anderen Stellen etwas zu viel. Nur im Mittel über die Runde stimmt
+  sie.
+- Die Streckenteile stehen von Hand in `strecke.json`. Ob sie zur aufgebauten Strecke und zur Spur des
+  Polygons passen, prüft das Programm nicht. Später sollen sie aus der Streckenerkennung über die
+  AprilTags kommen.
