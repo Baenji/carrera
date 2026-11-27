@@ -11,3 +11,5 @@ __pycache__/
 
 # NumPy-Dateien (z.B. aufgenommenes Strecken-Polygon, hängt vom Kameraaufbau ab)
 *.npy
+tb_logs/
+sim/models/

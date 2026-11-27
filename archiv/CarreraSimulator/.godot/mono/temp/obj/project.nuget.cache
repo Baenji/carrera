@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "dgSpecHash": "WyCiMa78l6s=",
+  "success": true,
+  "projectFilePath": "/Users/felixrehm/Library/CloudStorage/GoogleDrive-felix.rehm2000@gmail.com/My Drive/Hochschule Aschaffenburg/7. Semester/Data_Science_Projekt/carrera/archiv/CarreraSimulator/Godot RL Agents.csproj",
+  "expectedPackageFiles": [
+    "/Users/felixrehm/.nuget/packages/godot.sourcegenerators/4.0.3/godot.sourcegenerators.4.0.3.nupkg.sha512",
+    "/Users/felixrehm/.nuget/packages/godotsharp/4.0.3/godotsharp.4.0.3.nupkg.sha512",
+    "/Users/felixrehm/.nuget/packages/godotsharpeditor/4.0.3/godotsharpeditor.4.0.3.nupkg.sha512",
+    "/Users/felixrehm/.nuget/packages/microsoft.ml.onnxruntime/1.15.1/microsoft.ml.onnxruntime.1.15.1.nupkg.sha512",
+    "/Users/felixrehm/.nuget/packages/microsoft.ml.onnxruntime.managed/1.15.1/microsoft.ml.onnxruntime.managed.1.15.1.nupkg.sha512",
+    "/Users/felixrehm/.nuget/packages/system.memory/4.5.3/system.memory.4.5.3.nupkg.sha512",
+    "/Users/felixrehm/.nuget/packages/microsoft.netcore.app.ref/6.0.36/microsoft.netcore.app.ref.6.0.36.nupkg.sha512",
+    "/Users/felixrehm/.nuget/packages/microsoft.aspnetcore.app.ref/6.0.36/microsoft.aspnetcore.app.ref.6.0.36.nupkg.sha512"
+  ],
+  "logs": []
+}
