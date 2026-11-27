@@ -22,6 +22,16 @@ import cv2
 import numpy as np
 import select, termios, tty
 
+def calc_parameters():
+    # 0:  
+    # 1: Wo ist der Kipppunkt
+    # 2: Höchsten V-Wert vor Kipppunkt als v_max dieses Throttles -> Daraus sollte sich direkt K des PT-1-Glieds berechnen lassen
+    # 3: Was sind 63% von v_max
+    # 4: Welcher V-Wert liegt am nächsten an den 63%
+    # 5: Wie viel Zeit vergeht bis zu dieser 63% Geschwindigkeit -> T
+    # 6: für jeden Throttle je T und K abspeichern
+    pass
+
 def leertaste_gedrueckt() -> bool:
     """Wartet auf eine Taste: True bei Leertaste, False bei jeder anderen."""
     fd = sys.stdin.fileno()
@@ -71,7 +81,11 @@ if __name__ == "__main__":
                 # 3. Messen: alle 0.05 s ein Wert (wie dt in environment.py)
                 for t0, t1, v in speed_stream(show=False, intervall=0.05, kamera=kamera):
                     v_text = "- (Auto nicht erkannt)" if v is None else f"{v:.0f} mm/s"
-                    raw_vals[i].append([t0 - start, t1 - start, v])
+
+                    # Mittlere Zeitstempel und Geschwindigkeiten abspeichern
+                    t_val_0 = t0 - start
+                    t_val_1 = t1 - start
+                    raw_vals[i].append([(t_val_1 - t_val_0)/ 2 + t_val_0, v])
                     print(f"t0={t0 - start:.3f}  t1={t1 - start:.3f}  v={v_text}")
                     if t1 - start > 5:  # nach 5 s aufhören
                         break
