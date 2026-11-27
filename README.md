@@ -96,7 +96,7 @@ nur, wenn man im Ordner `src/` des Repos steht. Kamera und Arduino müssen anges
 ```bash
 cd <Pfad zum Repo>/src
 pwd                  # muss auf .../carrera/src enden
-python main.py       # Menü: Strecke einrichten, fahren, beenden
+python main.py       # Menü: Strecke einrichten, zum Start fahren, fahren, beenden
 ```
 
 Training und Auswertung der Modelle sind in `sim/readme.md` beschrieben.

@@ -8,6 +8,7 @@ Aus dem Ordner src/ starten:
 
 Befehle:
   e   Strecke einrichten (Spur aus config.LANE), das Auto fährt dabei eine langsame Runde
+  s   Langsam zum Start fahren und dort anhalten
   f   Fahren, Strg+C stoppt und führt zurück ins Menü
   q   Beenden
 """
@@ -20,7 +21,7 @@ from arduino import close, connect
 from perception.perception import Perception
 from perception.track_detector import TrackError
 
-MENU = "\n[e] Strecke einrichten   [f] Fahren   [q] Beenden: "
+MENU = "\n[e] Strecke einrichten   [s] Zum Start fahren   [f] Fahren   [q] Beenden: "
 
 
 def main() -> None:
@@ -37,6 +38,15 @@ def main() -> None:
                     print(f"[FEHLER] {error}")
                 except KeyboardInterrupt:
                     print("\nEinrichten abgebrochen.")
+            elif command == "s":
+                print("Fahre zum Start, Strg+C stoppt.")
+                try:
+                    control.drive_to_start(perception)
+                    print("Auto steht am Start.")
+                except TrackError as error:  # z. B. noch keine Strecke eingerichtet
+                    print(f"[FEHLER] {error}")
+                except KeyboardInterrupt:
+                    print("\nGestoppt.")
             elif command == "f":
                 print("Fahre, Strg+C stoppt.")
                 try:
