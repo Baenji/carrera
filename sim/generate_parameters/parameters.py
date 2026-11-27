@@ -22,15 +22,39 @@ import cv2
 import numpy as np
 import select, termios, tty
 
-def calc_parameters():
+def kipppunkt(werte, geduld=3):
+    """werte: Liste von [t, v]. Gibt [t, v] des Kipppunkts zurück."""
+    werte = [p for p in werte if p[1] is not None]  # nicht erkannte rausfiltern
+    if not werte:
+        return None, []
+
+    best_idx = 0
+    zaehler = 0
+    for i in range(1, len(werte)):
+        if werte[i][1] > werte[best_idx][1]:
+            best_idx = i
+            zaehler = 0
+        else:
+            zaehler += 1
+            if zaehler >= geduld:
+                break
+    return werte[best_idx], werte[:best_idx + 1]   # alle Werte bis einschließlich Kipppunkt
+
+def calc_parameters(messwerte):
+    parameters = {}
     # 0:  
     # 1: Wo ist der Kipppunkt
+    for i in messwerte: 
+        edge_point, relevant_vals = kipppunkt(i)
+        
     # 2: Höchsten V-Wert vor Kipppunkt als v_max dieses Throttles -> Daraus sollte sich direkt K des PT-1-Glieds berechnen lassen
+    v_max = edge_point[1]
+    K = vmax / i + 1
     # 3: Was sind 63% von v_max
     # 4: Welcher V-Wert liegt am nächsten an den 63%
     # 5: Wie viel Zeit vergeht bis zu dieser 63% Geschwindigkeit -> T
     # 6: für jeden Throttle je T und K abspeichern
-    pass
+    
 
 def leertaste_gedrueckt() -> bool:
     """Wartet auf eine Taste: True bei Leertaste, False bei jeder anderen."""
