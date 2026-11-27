@@ -13,3 +13,6 @@ __pycache__/
 *.npy
 tb_logs/
 sim/models/
+
+# Eingerichtete Strecke (Polygon in Pixeln, hängt vom Kameraaufbau ab)
+src/perception/track_map.json
