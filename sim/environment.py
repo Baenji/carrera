@@ -3,6 +3,18 @@ import gymnasium as gym
 from gymnasium import spaces
 import math
 
+import json
+from pathlib import Path
+
+PARAM_DATEI = Path(__file__).parent / "generate_parameters" / "parameters_2026-11-27_14-31.json"
+TOTZONE = 19   # darunter fährt das Auto nicht
+
+def throttle_consts_laden():
+    gemessen = {int(k): tuple(v) for k, v in json.load(open(PARAM_DATEI)).items()}
+    # Totzone: steht; T beliebig > 0 (wird nur zum Teilen gebraucht)
+    return [(0.0, 0.4) if p < TOTZONE else gemessen[p] for p in range(101)]
+
+
 class CarreraEnv(gym.Env):
 
     def __init__(self, layout: str = "1 3 R R L 3 L R R 3 1 R 3 3 3 R 3"):
@@ -44,17 +56,14 @@ class CarreraEnv(gym.Env):
 
         # Physik Konstanten 
         self.dt = 0.05 # TODO: Wert berichtigen
-        self.v_max = 3000 # Maximal Geschwindigkeit die das Auto erreichen kann #TODO: Wert berichtigen
-        self.d_max = 1200 # Wie hoch die Distanz zur nächsten Kurve maximal sein kann # TODO: Wert berichtigen
-        self.v_crash = 1300 #TODO: Berichtigen ->Kurvenaustrittsgeschwindigkeit muss gemessen werden
+        self.v_max = 3200 # Maximal Geschwindigkeit die das Auto erreichen kann #TODO: Wert berichtigen
+        self.d_max = 1260 # Wie hoch die Distanz zur nächsten Kurve maximal sein kann # TODO: Wert berichtigen
+        self.v_crash = 2200 #TODO: Berichtigen ->Kurvenaustrittsgeschwindigkeit muss gemessen werden
         # In der Liste stehen die Konstanten K und T für jeden throttle in der Form (K,T)
         # Ein Eintrag pro Throttlewert 0..100 -> 101 Einträge
         # Schätzung: unter 10 % Totzone (Auto bewegt sich nicht), darüber linear bis v_max; T ca. 0.4 s
         # -> durch Messungen ersetzen
-        self.throttle_consts = [
-            (0.0 if p < 10 else self.v_max * (p - 10) / 90, 0.4)
-            for p in range(101)
-        ]
+        self.throttle_consts = throttle_consts_laden()
  
 
     def _get_obs(self):
