@@ -1,0 +1,34 @@
+# Gemeinsame Abhängigkeiten für den Neubau (src/, sim/, experiments/), getestet mit Python 3.11.
+# Gilt für Windows, macOS und Linux: pip installiert die mit "; sys_platform == ..." markierten
+# Pakete nur auf dem jeweiligen Betriebssystem.
+#
+#   python -m venv .venv
+#   .venv\Scripts\activate          (Windows)
+#   source .venv/bin/activate       (macOS, Linux)
+#   pip install -r requirements.txt
+#
+# Für archiv/ gilt weiterhin archiv/requirements.txt.
+
+# Wahrnehmung: Kamera, Auto-Tracking, AprilTags
+numpy==2.2.6
+opencv-python==4.11.0.86
+pupil-apriltags==1.0.4.post11
+
+# Hardware: Arduino über die serielle Schnittstelle
+pyserial==3.5
+
+# Training und Simulation
+gymnasium==1.3.0
+stable-baselines3==2.9.0
+torch==2.14.1
+tensorboard==2.21.0
+matplotlib==3.11.2
+
+# GUI
+dearpygui==2.3.1
+
+# Kamera unter macOS: Frames über PyAV, weil OpenCV dort höchstens 30 fps liefert
+av==18.1.0; sys_platform == "darwin"
+
+# Kamera unter Windows: findet die Brio per Name statt per Index
+pygrabber==0.2; sys_platform == "win32"
