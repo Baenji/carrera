@@ -19,10 +19,8 @@ import math
 
 # Maße laut Wiki ("Überarbeitung Streckenerkennung"), Set "DTM High Speed Showdown"
 STRAIGHT_LENGTHS_MM = {1: 114.0, 2: 171.0, 3: 342.0}  # Schlüssel wie in der tag_list
-CURVE_INNER_RADIUS_MM = 144.0  # Radius der inneren Spur
-CURVE_OUTER_RADIUS_MM = 201.0  # Radius der äußeren Spur
-CURVE_INNER_LENGTH_MM = math.pi / 2 * CURVE_INNER_RADIUS_MM  # 90°-Bogen innen ≈ 226 mm
-CURVE_OUTER_LENGTH_MM = math.pi / 2 * CURVE_OUTER_RADIUS_MM  # 90°-Bogen außen ≈ 316 mm
+CURVE_INNER_LENGTH_MM = 226.2
+CURVE_OUTER_LENGTH_MM = 315.7
 LANES = ("links", "rechts")
 
 
