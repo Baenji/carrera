@@ -1,7 +1,6 @@
 """Spur als Polygon aufnehmen, mit der erkannten Strecke abgleichen, Position auf die Strecke projizieren.
 
-Übernommen aus experiments/car_to_track/car_to_track.py (Polygon, calculate_progress) und
-experiments/car_to_track/car_speed.py (calculate_lane_length).
+Übernommen aus experiments/car_to_track/car_to_track.py (Polygon, calculate_progress).
 
 Polygon: Das Auto fährt die Strecke ab, die Positionen liegen also schon in Fahrtrichtung vor.
 Eine aufgenommene Runde ist damit direkt das Polygon der Spur. Sortieren ist nicht nötig.
@@ -28,12 +27,6 @@ TRACK_MAP_FILE = Path(__file__).resolve().parent / "track_map.json"
 MIN_POINT_DISTANCE = 5  # px: neuer Punkt erst ab diesem Abstand zum letzten (sonst Punkthaufen beim Stehen)
 CLOSE_DISTANCE = 30  # px: so nah am Startpunkt gilt die Runde als geschlossen
 MIN_POINTS = 100  # Mindestanzahl Punkte (≈ 500 px Weg), damit die Runde nicht sofort schließt
-
-# Teilemaße laut Wiki ("Überarbeitung Streckenerkennung"), Set "DTM High Speed Showdown".
-# Gehört laut Architektur später nach track_parts.py.
-STRAIGHT_LENGTHS_MM = {1: 114.0, 2: 171.0, 3: 342.0}  # Schlüssel wie in der tag_list
-CURVE_INNER_LENGTH_MM = math.pi / 2 * 144  # 90°-Kurve auf der inneren Spur ≈ 226 mm
-CURVE_OUTER_LENGTH_MM = math.pi / 2 * 201  # 90°-Kurve auf der äußeren Spur ≈ 316 mm
 
 
 def record_lap(positions: Iterable[tuple[int, int] | None]) -> np.ndarray | None:
@@ -93,26 +86,6 @@ def find_start_point(start_point_px: tuple[float, float], polygon: np.ndarray) -
     """Anteil der Runde (0..1 ab dem ersten Polygonpunkt), an dem der Anfang des Startteils liegt."""
     start_progress, _ = calculate_progress(start_point_px, polygon)
     return start_progress
-
-
-def calculate_lane_length(tag_list: list[int | str], lane: str) -> float:
-    """Länge der Spur, auf der das Auto fährt, in mm.
-
-    lane: "links" oder "rechts", in Fahrtrichtung gesehen. Die rechte Spur ist in Rechtskurven
-    innen (kurz) und in Linkskurven außen (lang).
-    """
-    if lane not in ("links", "rechts"):
-        raise ValueError(f"Spur muss 'links' oder 'rechts' sein, nicht {lane!r}")
-    inner_turn = "R" if lane == "rechts" else "L"  # in dieser Kurvenrichtung fährt das Auto innen
-    lane_length_mm = 0.0
-    for part in tag_list:
-        if part in STRAIGHT_LENGTHS_MM:
-            lane_length_mm += STRAIGHT_LENGTHS_MM[part]
-        elif part in ("R", "L"):
-            lane_length_mm += CURVE_INNER_LENGTH_MM if part == inner_turn else CURVE_OUTER_LENGTH_MM
-        else:
-            raise ValueError(f"Unbekanntes Teil {part!r} in der tag_list")
-    return lane_length_mm
 
 
 def calculate_position_mm(

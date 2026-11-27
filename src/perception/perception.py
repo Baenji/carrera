@@ -27,6 +27,7 @@ import time
 from collections import deque
 from typing import Iterator
 
+import track_parts
 from perception import camera, car_tracker, track_detector, track_map
 from perception.track_detector import TrackError
 
@@ -76,7 +77,7 @@ class Perception:
         """
         frames = [camera.read_frame(self.camera) for _ in range(DETECT_FRAMES)]
         tag_list, start_point_px = track_detector.detect_track(frames)
-        lane_length_mm = track_map.calculate_lane_length(tag_list, lane)
+        lane_length_mm = track_parts.calculate_lane_length(tag_list, lane)
         print(f"[strecke] tag_list = {tag_list}, Spur {lane}: {lane_length_mm:.0f} mm")
         self.detected_track = (tag_list, lane, start_point_px)
 
@@ -116,7 +117,7 @@ class Perception:
     def generate_measurements(self) -> Iterator[tuple[float | None, float | None, str]]:
         """Liefert pro Kamerabild (Position in mm ab Start, Geschwindigkeit in mm/s, Status)."""
         tag_list, lane = self.get_track_layout()
-        lane_length_mm = track_map.calculate_lane_length(tag_list, lane)
+        lane_length_mm = track_parts.calculate_lane_length(tag_list, lane)
         position_samples: deque[tuple[float, float]] = deque()  # (Zeit in s, Position in mm)
         while True:
             frame = camera.read_frame(self.camera)
