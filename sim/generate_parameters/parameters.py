@@ -7,7 +7,9 @@ Voraussetzungen:
   - Kamera (Brio) hängt über der Bahn, das Auto hat den blauen Punkt
   - sim/car_to_track/track_polygon.npy existiert (vorher einmal car_speed.py starten und mit [r] aufnehmen)
 
-Start: python sim/generate_parameters/parameters.py --throttle 40 --dauer 5
+Start:
+  python sim/generate_parameters/parameters.py                                  # neu messen + auswerten
+  python sim/generate_parameters/parameters.py --raw raw_vals_2026-11-27_14-31.json   # nur vorhandene Rohwerte auswerten
 """
 
 from __future__ import annotations
@@ -23,11 +25,23 @@ import cv2
 import numpy as np
 import select, termios, tty
 
-def kipppunkt(werte, geduld=3):
-    """werte: Liste von [t, v]. Gibt [t, v] des Kipppunkts zurück."""
-    werte = [p for p in werte if p[1] is not None]  # nicht erkannte rausfiltern
+V_MAX_PLAUSIBEL = 4000    # mm/s, alles darüber ist ein Tracking-Fehler (z.B. Sprünge auf ~10000)
+
+def filtern(werte):
+    """Wirft nicht erkannte (None) und physikalisch unmögliche Werte (negativ, zu groß) raus."""
+    return [p for p in werte if p[1] is not None and 0 <= p[1] <= V_MAX_PLAUSIBEL]
+
+def glaetten(werte):
+    """Gleitender Median über 3 Werte: einzelne Ausreißer-Spitzen fliegen raus,
+    ein echter Anstieg bleibt erhalten. Zeitstempel bleiben unverändert."""
+    v = [p[1] for p in werte]
+    return [[werte[i][0], float(np.median(v[max(i - 1, 0):i + 2]))] for i in range(len(werte))]
+
+def kipppunkt(werte, geduld=4):  # 4: kurzes Stocken beim Hochlaufen (3 Werte) ist noch keine Kurve
+    """werte: gefilterte Liste von [t, v].
+    Gibt (Index des Kipppunkts, [t, v] des Kipppunkts, alle Werte bis einschließlich Kipppunkt) zurück."""
     if not werte:
-        return None, []
+        return None, None, []
 
     best_idx = 0
     zaehler = 0
@@ -39,22 +53,24 @@ def kipppunkt(werte, geduld=3):
             zaehler += 1
             if zaehler >= geduld:
                 break
-    return werte[best_idx], werte[:best_idx + 1]   # alle Werte bis einschließlich Kipppunkt
+    return best_idx, werte[best_idx], werte[:best_idx + 1]   # alle Werte bis einschließlich Kipppunkt
 
 def calc_parameters(messwerte):
     parameters = {}
-    # 0:  
-    # 1: Wo ist der Kipppunkt
-    for throttle, werte in messwerte.items(): 
-        edge_point, relevant_vals = kipppunkt(werte)
-        if edge_point is None: 
-            continue 
-        # 2: Höchsten V-Wert vor Kipppunkt als v_max dieses Throttles -> Daraus sollte sich direkt K des PT-1-Glieds berechnen lassen
-        v_max = edge_point[1]
-        K = v_max 
+    for throttle, werte in messwerte.items():
+        # 0: Ungültige Werte rausfiltern und einzelne Ausreißer glätten
+        werte = glaetten(filtern(werte))
 
-        # 3: Was sind 63% von v_max
-        v_63 = v_max * 0.63
+        # 1: Wo ist der Kipppunkt = wo wird zum ersten Mal (durch die Kurve) abgebremst
+        _, edge_point, relevant_vals = kipppunkt(werte)
+        if edge_point is None:
+            continue
+
+        # 2: Höchste Geschwindigkeit bis zur ersten Kurve = K
+        K = edge_point[1]
+
+        # 3: Was sind 63% von K
+        v_63 = K * 0.63
 
         # 4: Welcher V-Wert liegt am nächsten an den 63%
         best_val = relevant_vals[0]
@@ -79,8 +95,12 @@ def speichern(daten, dateiname):
     print(f"Gespeichert: {DATEN / dateiname}")
 
 def laden(dateiname):
-    """Lädt ein gespeichertes Dict. JSON-Schlüssel sind Strings -> wieder zu int machen."""
-    with open(DATEN / dateiname) as f:
+    """Lädt ein gespeichertes Dict. JSON-Schlüssel sind Strings -> wieder zu int machen.
+    dateiname: Pfad oder nur Dateiname (wird dann in sim/generate_parameters/ gesucht)."""
+    pfad = Path(dateiname)
+    if not pfad.exists():
+        pfad = DATEN / pfad.name
+    with open(pfad) as f:
         daten = json.load(f)
     return {int(k): v for k, v in daten.items()}
 
@@ -117,7 +137,8 @@ sys.path.insert(0, str(ROOT / "sim" / "car_to_track"))
 from car_speed import kamera_starten, main as speed_stream  # noqa: E402
 
 
-if __name__ == "__main__":
+def messen():
+    """Fährt die Throttles nacheinander ab und gibt (raw_vals, zeitstempel) zurück."""
     # 1. Einrichten: Arduino verbinden, Kamera öffnen, Referenzbild bei stehendem Auto
     arduino = ArduinoInterface()
     kamera = kamera_starten()
@@ -152,6 +173,19 @@ if __name__ == "__main__":
         # Rohwerte im finally speichern -> gehen auch bei Abbruch (Strg+C, Fehler) nicht verloren
         if raw_vals:
             speichern(raw_vals, f"raw_vals_{zeitstempel}.json")
+    return raw_vals, zeitstempel
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--raw", help="vorhandene raw_vals_*.json auswerten, statt neu zu messen")
+    args = parser.parse_args()
+
+    if args.raw:
+        raw_vals = laden(args.raw)
+        zeitstempel = Path(args.raw).stem.removeprefix("raw_vals_")  # Parameter bekommen den Stempel der Rohwerte
+    else:
+        raw_vals, zeitstempel = messen()
 
     parameters = calc_parameters(raw_vals)
     speichern(parameters, f"parameters_{zeitstempel}.json")
