@@ -13,6 +13,7 @@ Start: python sim/generate_parameters/parameters.py --throttle 40 --dauer 5
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from collections import deque
@@ -57,17 +58,31 @@ def calc_parameters(messwerte):
 
         # 4: Welcher V-Wert liegt am nächsten an den 63%
         best_val = relevant_vals[0]
-        diff = 10000
+        diff = float("inf")
         for i in range(len(relevant_vals)): 
-            if abs(i[1] - v_63) < diff: 
-                diff =  abs(i[1] - v_63)
+            if abs(relevant_vals[i][1] - v_63) < diff: 
+                diff =  abs(relevant_vals[i][1] - v_63)
                 best_val = relevant_vals[i]
 
         # 5: Wie viel Zeit vergeht bis zu dieser 63% Geschwindigkeit -> T
         T = best_val[0]
         # 6: für jeden Throttle je T und K abspeichern
-        parameters[throttle].append([K, T])
-    return parameters 
+        parameters[throttle] = (K, T)
+    return parameters
+
+DATEN = Path(__file__).resolve().parent  # sim/generate_parameters/
+
+def speichern(daten, dateiname):
+    """Speichert ein Dict {throttle: ...} als JSON in sim/generate_parameters/."""
+    with open(DATEN / dateiname, "w") as f:
+        json.dump(daten, f, indent=2, default=float)  # default=float: numpy-Zahlen in normale floats umwandeln
+    print(f"Gespeichert: {DATEN / dateiname}")
+
+def laden(dateiname):
+    """Lädt ein gespeichertes Dict. JSON-Schlüssel sind Strings -> wieder zu int machen."""
+    with open(DATEN / dateiname) as f:
+        daten = json.load(f)
+    return {int(k): v for k, v in daten.items()}
 
 def leertaste_gedrueckt() -> bool:
     """Wartet auf eine Taste: True bei Leertaste, False bei jeder anderen."""
@@ -107,6 +122,7 @@ if __name__ == "__main__":
     arduino = ArduinoInterface()
     kamera = kamera_starten()
     raw_vals = {}
+    zeitstempel = time.strftime("%Y-%m-%d_%H-%M")  # gleicher Stempel für Rohwerte und Parameter
     try:
         # 2. Losfahren
         for i in range(101): 
@@ -133,4 +149,10 @@ if __name__ == "__main__":
     finally:
         arduino.close()  # setzt Throttle auf 0
         kamera[0].release()
-        print(raw_vals)
+        # Rohwerte im finally speichern -> gehen auch bei Abbruch (Strg+C, Fehler) nicht verloren
+        if raw_vals:
+            speichern(raw_vals, f"raw_vals_{zeitstempel}.json")
+
+    parameters = calc_parameters(raw_vals)
+    speichern(parameters, f"parameters_{zeitstempel}.json")
+    print(parameters)
