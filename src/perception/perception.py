@@ -15,9 +15,11 @@ letzten SPEED_WINDOW_SECONDS gemittelt, weil schon wenige Pixel Jitter von Frame
 Sprünge ergeben. Wird das Auto länger nicht erkannt, gibt es keine Geschwindigkeit statt einer
 erfundenen.
 
+Spur, Kamera und Auflösung stehen in config.py.
+
 Test ohne Steuerung (Auto mit dem Handregler fahren), aus dem Ordner src/ starten:
-  python -m perception.perception --spur rechts   # Strecke neu einrichten, dann messen
-  python -m perception.perception                 # gespeicherte Strecke laden, messen
+  python -m perception.perception --einrichten   # Strecke neu einrichten, dann messen
+  python -m perception.perception                # gespeicherte Strecke laden, messen
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ import time
 from collections import deque
 from typing import Iterator
 
+import config
 import track_parts
 from perception import camera, car_tracker, track_detector, track_map
 from perception.track_detector import TrackError
@@ -57,10 +60,11 @@ def calculate_speed(
 class Perception:
     """Hält Kamera, Tracker und Strecke zwischen Einrichten und Fahren."""
 
-    def __init__(self, device: str | int | None = None):
-        device = device if device is not None else camera.find_brio()
-        # Eine Auflösung für alles, damit Polygon und AprilTags dieselben Pixelkoordinaten haben
-        self.camera = camera.open_camera(device, 1280, 720, 60)
+    def __init__(self):
+        device = config.CAMERA_DEVICE if config.CAMERA_DEVICE is not None else camera.find_brio()
+        self.camera = camera.open_camera(
+            device, config.CAMERA_WIDTH_PX, config.CAMERA_HEIGHT_PX, config.CAMERA_FPS
+        )
         camera.lock_camera(self.camera, camera.DEFAULT_EXPOSURE)
         self.tracker = car_tracker.DiffTracker()
         self.tracker.set_reference(
@@ -112,6 +116,11 @@ class Perception:
         """Gibt (tag_list, Spur) der eingerichteten Strecke zurück."""
         if self.track is None:
             raise TrackError("Noch keine Strecke eingerichtet.")
+        if self.track["lane"] != config.LANE:
+            raise TrackError(
+                f"Die Strecke wurde für Spur {self.track['lane']} eingerichtet, in config.py steht "
+                f"Spur {config.LANE}. Strecke neu einrichten."
+            )
         return self.track["tag_list"], self.track["lane"]
 
     def generate_measurements(self) -> Iterator[tuple[float | None, float | None, str]]:
@@ -148,21 +157,18 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "--spur",
-        choices=["links", "rechts"],
-        help="Strecke neu einrichten, das Auto fährt auf dieser Spur",
-    )
-    parser.add_argument(
-        "--device", default=None, help="Kamera (Pfad, Index oder Name). Default: Brio suchen"
+        "--einrichten",
+        action="store_true",
+        help="Strecke neu einrichten, das Auto fährt auf der Spur aus config.LANE",
     )
     args = parser.parse_args()
-    if args.spur is None and not track_map.TRACK_MAP_FILE.exists():
-        parser.error("Noch keine Strecke eingerichtet, erst mit --spur links oder --spur rechts starten.")
+    if not args.einrichten and not track_map.TRACK_MAP_FILE.exists():
+        parser.error("Noch keine Strecke eingerichtet, erst mit --einrichten starten.")
 
-    perception = Perception(args.device)
+    perception = Perception()
     try:
-        if args.spur:
-            perception.detect_track(args.spur)
+        if args.einrichten:
+            perception.detect_track(config.LANE)
             print(
                 "[strecke] Auto jetzt langsam eine Runde fahren lassen "
                 f"(höchstens {LAP_TIMEOUT_SECONDS:.0f} s)"

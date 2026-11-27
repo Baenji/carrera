@@ -20,16 +20,9 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-# Farbbereich des blauen Punkts in HSV (OpenCV: H 0-179, S und V 0-255).
-# Kalibriert für den dunkleren Punkt bei fester Belichtung von 3,9 ms (camera.DEFAULT_EXPOSURE).
-# H oben und S unten mit Puffer: an einer Stelle der Strecke lag der Punkt bei H=118, S=116.
-BLUE_LOW = (104, 90, 40)
-BLUE_HIGH = (125, 255, 255)
-MIN_DOT_AREA = 15  # px: Mindestanzahl blauer Pixel, damit einzelne Rauschpixel nicht als Punkt zählen
+import config
 
-# Bei anderem Aufbau neu messen
-CAMERA_HEIGHT = 108.0  # cm: Kamera über der Bahn
-DOT_HEIGHT = 2.0  # cm: blauer Punkt über der Bahn
+MIN_DOT_AREA = 15  # px: Mindestanzahl blauer Pixel, damit einzelne Rauschpixel nicht als Punkt zählen
 
 
 class DiffTracker:
@@ -140,7 +133,7 @@ def find_blue_dot(frame: np.ndarray, diff_mask: np.ndarray) -> tuple[int, int] |
     diff_mask: Differenzmaske vom DiffTracker in derselben Auflösung
     """
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    blue_mask = cv2.inRange(hsv, BLUE_LOW, BLUE_HIGH)
+    blue_mask = cv2.inRange(hsv, config.BLUE_DOT_HSV_LOW, config.BLUE_DOT_HSV_HIGH)
     # Nur Blau, das nicht schon im Referenzbild war (z.B. blaue Dinge neben der Strecke)
     blue_mask = cv2.bitwise_and(blue_mask, diff_mask)
 
@@ -161,11 +154,12 @@ def correct_parallax(
     """Rechnet die Position des Punkts auf die Stelle der Bahn direkt darunter zurück.
 
     Der Punkt erscheint um den Faktor H / (H - h) weiter von der Bildmitte entfernt als die
-    Bahn unter ihm (H = CAMERA_HEIGHT, h = DOT_HEIGHT), also wird er um (H - h) / H zur
-    Bildmitte hin gezogen.
+    Bahn unter ihm (H = Kamerahöhe, h = Punkthöhe über der Bahn, beide aus config), also wird er
+    um (H - h) / H zur Bildmitte hin gezogen.
     Annahme: Die Kamera schaut senkrecht nach unten (Bildmitte = Stelle unter der Kamera).
     """
-    scale = (CAMERA_HEIGHT - DOT_HEIGHT) / CAMERA_HEIGHT
+    camera_height_cm = config.CAMERA_HEIGHT_ABOVE_TRACK_CM
+    scale = (camera_height_cm - config.DOT_HEIGHT_ABOVE_TRACK_CM) / camera_height_cm
     center_x, center_y = frame_shape[1] / 2, frame_shape[0] / 2
     return (
         round(center_x + (position[0] - center_x) * scale),
