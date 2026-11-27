@@ -31,8 +31,8 @@ import track_parts
 # Normierung: muss zu d_max und v_max in sim/environment.py passen, sonst sieht das Modell an der
 # echten Bahn andere Zahlen als im Training. Ändert sich ein Wert, muss das Modell neu trainiert
 # werden. Sobald die Simulation state.py direkt nutzt, stehen die Werte nur noch hier.
-MAX_DISTANCE_MM = 1200.0
-MAX_SPEED_MM_PER_S = 3000.0
+MAX_DISTANCE_MM = 1260.0
+MAX_SPEED_MM_PER_S = 3200.0
 
 
 @lru_cache(maxsize=8)

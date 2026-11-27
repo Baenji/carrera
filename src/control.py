@@ -25,7 +25,7 @@ from state import generate_states
 
 # Trainiertes Modell aus sim/train.py. Pfad relativ zu dieser Datei, damit es egal ist, von wo
 # aus gestartet wird.
-MODEL_FILE = Path(__file__).parent / "model" / "ppo_2026-11-27_09-27.zip"
+MODEL_FILE = Path(__file__).parent / "model" / "ppo_2026-11-27_15-29.zip"
 SETUP_THROTTLE = 30  # 0-100, beim Einrichten: langsam, aber schnell genug zum Anfahren. An der Bahn ausprobieren.
 DRIVE_TO_START_THROTTLE = 25  # 0-100, beim Fahren zum Start
 # So weit vor dem Start geht das Gas weg: Das Auto rollt noch aus, und das Kamerabild ist schon
