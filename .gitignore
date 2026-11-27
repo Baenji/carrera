@@ -11,3 +11,6 @@ __pycache__/
 
 # NumPy-Dateien (z.B. aufgenommenes Strecken-Polygon, hängt vom Kameraaufbau ab)
 *.npy
+
+# Eingerichtete Strecke (Polygon in Pixeln, hängt vom Kameraaufbau ab)
+src/perception/track_map.json
