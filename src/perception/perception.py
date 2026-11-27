@@ -112,7 +112,7 @@ class Perception:
         while time.perf_counter() < end_time:
             yield car_tracker.find_car(self.tracker, camera.read_frame(self.camera))
 
-    def get_track_layout(self) -> tuple[list[int | str], str]:
+    def get_track_layout(self) -> tuple[list[str], str]:
         """Gibt (tag_list, Spur) der eingerichteten Strecke zurück."""
         if self.track is None:
             raise TrackError("Noch keine Strecke eingerichtet.")

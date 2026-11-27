@@ -2,9 +2,9 @@
 
 Übernommen aus experiments/track_detection/track_from_tags.py.
 
-tag_list  Streckenteile in Fahrtrichtung, beginnend beim Start, z. B. [1, 3, "R", "R", "L", 3, ...]
-          1 / 2 / 3 = kurze / mittlere / lange Gerade, "L" / "R" = Links- / Rechtskurve.
-          Der Start steht als 1 an erster Stelle, weil er so lang ist wie eine kurze Gerade.
+tag_list  Streckenteile in Fahrtrichtung, beginnend beim Start, z. B. ["1", "3", "R", "R", "L", "3", ...]
+          "1" / "2" / "3" = kurze / mittlere / lange Gerade, "L" / "R" = Links- / Rechtskurve.
+          Der Start steht als "1" an erster Stelle, weil er so lang ist wie eine kurze Gerade.
 
 Wie die Reihenfolge entsteht:
   Aus Position und Drehung jedes Tags und den Teilemaßen wird berechnet, wo die beiden Enden
@@ -125,7 +125,7 @@ def calculate_piece_ends(tag: dict) -> list[np.ndarray]:
     return [tag["center"] - half_length, tag["center"] + half_length]
 
 
-def build_tag_list(tags: list[dict]) -> tuple[list[int | str], list[dict]]:
+def build_tag_list(tags: list[dict]) -> tuple[list[str], list[dict]]:
     """Tags in Fahrtrichtung ordnen. Gibt (tag_list, geordnete Tags) zurück, tag_list wie oben beschrieben."""
     starts = [tag for tag in tags if tag["id"] == START_ID]
     if len(starts) != 1:
@@ -183,13 +183,13 @@ def build_tag_list(tags: list[dict]) -> tuple[list[int | str], list[dict]]:
         if turn:  # Kurve -> "L" oder "R"
             tag_list.append(turn)
         elif tag["id"] == START_ID:  # Start ist so lang wie die kurze Gerade (ID 1)
-            tag_list.append(1)
+            tag_list.append("1")
         else:
-            tag_list.append(tag["id"])
+            tag_list.append(str(tag["id"]))
     return tag_list, ordered
 
 
-def detect_track(frames: list[np.ndarray]) -> tuple[list[int | str], tuple[float, float]]:
+def detect_track(frames: list[np.ndarray]) -> tuple[list[str], tuple[float, float]]:
     """Erkennt die Strecke auf mehreren Kamerabildern.
 
     Gibt (tag_list, Anfang des Startteils in px) zurück. Der Anfang des Startteils ist der
